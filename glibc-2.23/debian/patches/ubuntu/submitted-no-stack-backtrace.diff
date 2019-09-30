@@ -1,0 +1,35 @@
+Description: Disable backtraces when triggering __stack_chk_fail, since
+ the stack is corrupted, and potentially dangerous to process.
+Author: Kees Cook <kees@ubuntu.com>
+Bug: http://sourceware.org/bugzilla/show_bug.cgi?id=12189
+Forwarded: no, not wanted by upstream
+
+Index: eglibc-2.15/debug/fortify_fail.c
+===================================================================
+--- eglibc-2.15.orig/debug/fortify_fail.c	2007-09-25 08:22:16.000000000 -0700
++++ eglibc-2.15/debug/fortify_fail.c	2012-05-07 11:46:38.845693697 -0700
+@@ -17,6 +17,7 @@
+
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+
+
+ extern char **__libc_argv attribute_hidden;
+@@ -27,9 +27,15 @@
+ __attribute__ ((noreturn)) internal_function
+ __fortify_fail (const char *msg)
+ {
++  int do_abort;
++  /* Disable backtraces for fortify failures on the stack.  */
++  if (strncmp(msg, "stack", 5) == 0)
++    do_abort = 1;
++  else
++    do_abort = 2;
+   /* The loop is added only to keep gcc happy.  */
+   while (1)
+-    __libc_message (2, "*** %s ***: %s terminated\n",
++    __libc_message (do_abort, "*** %s ***: %s terminated\n",
+ 		    msg, __libc_argv[0] ?: "<unknown>");
+ }
+ libc_hidden_def (__fortify_fail)

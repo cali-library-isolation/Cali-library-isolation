@@ -1,0 +1,22 @@
+Oops, these old _DEBIAN_ symbol versions don't play nice with the new upstream
+sorting scripts.  Hack around that for now, and we'll have to rebuild packages
+using these symbols to get rid of the oddly-shaped _DEBIAN_ version.
+
+Index: glibc-2.21/scripts/versionlist.awk
+===================================================================
+--- glibc-2.21.orig/scripts/versionlist.awk
++++ glibc-2.21/scripts/versionlist.awk
+@@ -54,11 +54,11 @@ END {
+     # for the cases we have so far.  e.g. GCC_3.0 is "later than"
+     # all GLIBC_* sets that matter for purposes of Versions files.
+ 
+-    sort = "sort -u -t. -k 1,1 -k 2n,2n -k 3";
++    sort = "sed s/_DEBIAN_/.DEBIAN_/ | sort -u -t. -k 1,1 -k 2n,2n -k 3 | sed s/.DEBIAN_/_DEBIAN_/";
+     printf "%s", libs[lib] | sort;
+     close(sort);
+ 
+-    sort = "sort -u -t. -k 1,1 -k 2n,2n -k 3";
++    sort = "sed s/_DEBIAN_/.DEBIAN_/ | sort -u -t. -k 1,1 -k 2n,2n -k 3 | sed s/.DEBIAN_/_DEBIAN_/";
+     printf "%s", others_libs[lib] | sort;
+     close(sort);
+ 

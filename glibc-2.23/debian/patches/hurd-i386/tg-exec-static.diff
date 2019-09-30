@@ -1,0 +1,23 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: [PATCH] Fix boot with statically-linked exec server.
+
+* sysdeps/mach/hurd/i386/init-first.c (init): Also find ELF headers by oneself
+when the pointer given in D is nul (as set by ext2fs).
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+---
+ sysdeps/mach/hurd/i386/init-first.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/sysdeps/mach/hurd/i386/init-first.c
++++ b/sysdeps/mach/hurd/i386/init-first.c
+@@ -168,7 +168,7 @@ init (int *data)
+   /* If we are the bootstrap task started by the kernel,
+      then after the environment pointers there is no Hurd
+      data block; the argument strings start there.  */
+-  if ((void *) d == argv[0])
++  if ((void *) d == argv[0] || !d->phdr)
+     {
+       /* With a new enough linker (binutils-2.23 or better),
+          the magic __ehdr_start symbol will be available and

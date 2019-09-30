@@ -1,0 +1,25 @@
+--- a/sysdeps/posix/getaddrinfo.c
++++ b/sysdeps/posix/getaddrinfo.c
+@@ -2522,8 +2522,21 @@
+ 		}
+ 
+ 	      socklen_t sl = sizeof (results[i].source_addr);
++	      const struct sockaddr *sa = q->ai_addr;
++#ifdef __FreeBSD_kernel__
++	      struct sockaddr_in6 sa_in6;
++	      /* The FreeBSD kernel doesn't allow connections on port 0. Use
++	         port 1 instead, as on the FreeBSD libc. */
++	      if (((struct sockaddr_in *)sa)->sin_port == htons(0))
++		{
++		  sa = (struct sockaddr *)&sa_in6;
++		  memcpy(&sa_in6, q->ai_addr, q->ai_family == AF_INET6 ?
++		       sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
++		  sa_in6.sin6_port = htons(1);
++		}
++#endif
+ 	      if (fd != -1
+-		  && __connect (fd, q->ai_addr, q->ai_addrlen) == 0
++		  && __connect (fd, sa, q->ai_addrlen) == 0
+ 		  && __getsockname (fd,
+ 				    (struct sockaddr *) &results[i].source_addr,
+ 				    &sl) == 0)

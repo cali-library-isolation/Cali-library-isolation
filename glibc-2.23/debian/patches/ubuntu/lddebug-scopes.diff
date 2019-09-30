@@ -1,0 +1,34 @@
+From 0c95ab64cb4ec0d22bb222647d9d20c7b4903e38 Mon Sep 17 00:00:00 2001
+From: Andreas Schwab <schwab@redhat.com>
+Date: Fri, 7 Oct 2011 09:31:27 +0200
+Subject: [PATCH] Horrible workaround for horribly broken software
+
+---
+ elf/rtld.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+Index: eglibc-2.17/elf/setup-vdso.h
+===================================================================
+--- eglibc-2.17/elf/setup-vdso.h	2012-10-26 05:23:28.000000000 +0100
++++ eglibc-2.17/elf/setup-vdso.h	2012-10-26 05:23:48.269510964 +0100
+@@ -1414,7 +1414,9 @@
+ 	  char *copy = malloc (len);
+ 	  if (copy == NULL)
+ 	    _dl_fatal_printf ("out of memory\n");
+-	  l->l_libname->name = l->l_name = memcpy (copy, dsoname, len);
++	  l->l_libname->name = memcpy (copy, dsoname, len);
++	  if (GLRO(dl_debug_mask))
++	    l->l_name = copy;
+ 	}
+ 
+       /* Add the vDSO to the object list.  */
+--- glibc-2.21.orig/elf/Makefile
++++ glibc-2.21/elf/Makefile
+@@ -126,6 +126,6 @@ tests = tst-tls1 tst-tls2 tst-tls9 tst-l
+ tests-static = tst-tls1-static tst-tls2-static tst-stackguard1-static \
+ 	       tst-leaks1-static tst-array1-static tst-array5-static \
+-	       tst-ptrguard1-static tst-dl-iter-static \
++	       tst-ptrguard1-static \
+ 	       tst-tlsalign-static tst-tlsalign-extern-static
+ ifeq (yes,$(build-shared))
+ tests-static += tst-tls9-static

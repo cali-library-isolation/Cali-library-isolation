@@ -1,0 +1,19 @@
+Description: pro-actively disable LD_AUDIT for setuid binaries, regardless
+ of where the libraries are loaded from. This is to try to make sure that
+ CVE-2010-3856 cannot sneak back in. Upstream is unlikely to take this,
+ since it limits the functionality of LD_AUDIT.
+Author: Kees Cook <kees@ubuntu.com>
+
+Index: eglibc-2.15/elf/rtld.c
+===================================================================
+--- eglibc-2.15.orig/elf/rtld.c	2012-05-09 10:05:29.456899131 -0700
++++ eglibc-2.15/elf/rtld.c	2012-05-09 10:38:53.952009069 -0700
+@@ -2529,7 +2529,7 @@
+   while ((p = (strsep) (&str, ":")) != NULL)
+     if (p[0] != '\0'
+ 	&& (__builtin_expect (! __libc_enable_secure, 1)
+-	    || strchr (p, '/') == NULL))
++	))
+       {
+ 	/* This is using the local malloc, not the system malloc.  The
+ 	   memory can never be freed.  */

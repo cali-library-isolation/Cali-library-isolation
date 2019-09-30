@@ -1,0 +1,53 @@
+Index: glibc/libpthread/Makefile
+===================================================================
+--- glibc.orig/libpthread/Makefile
++++ glibc/libpthread/Makefile
+@@ -189,7 +189,7 @@ headers :=				\
+ ifeq ($(IN_GLIBC),yes)
+ distribute :=
+ 
+-routines := forward libc_pthread_init
++routines := forward libc_pthread_init alloca_cutoff
+ shared-only-routines = forward
+ 
+ vpath %.c
+Index: glibc/libpthread/pthread/alloca_cutoff.c
+===================================================================
+--- /dev/null
++++ glibc/libpthread/pthread/alloca_cutoff.c
+@@ -0,0 +1,7 @@
++#include <alloca.h>
++int
++__libc_alloca_cutoff (size_t size)
++{
++	return size <= 4096;
++}
++libc_hidden_def (__libc_alloca_cutoff)
+Index: glibc-2.21/libpthread/Versions
+===================================================================
+--- glibc-2.21.orig/libpthread/Versions
++++ glibc-2.21/libpthread/Versions
+@@ -36,6 +36,7 @@ libc {
+     __pthread_get_cleanup_stack;
+   }
+   GLIBC_PRIVATE {
++    __libc_alloca_cutoff;
+     __libc_pthread_init;
+     __register_atfork;
+   }
+Index: glibc-2.21/sysdeps/pthread/allocalim.h
+===================================================================
+--- glibc-2.21.orig/sysdeps/pthread/allocalim.h
++++ glibc-2.21/sysdeps/pthread/allocalim.h
+@@ -24,6 +24,9 @@ extern __always_inline
+ int
+ __libc_use_alloca (size_t size)
+ {
+-  return (__builtin_expect (size <= PTHREAD_STACK_MIN / 4, 1)
+-	  || __builtin_expect (__libc_alloca_cutoff (size), 1));
++  return (
++#ifdef PTHREAD_STACK_MIN
++	 __builtin_expect (size <= PTHREAD_STACK_MIN / 4, 1) ||
++#endif
++	  __builtin_expect (__libc_alloca_cutoff (size), 1));
+ }

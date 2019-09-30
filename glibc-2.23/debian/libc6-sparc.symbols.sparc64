@@ -1,0 +1,6 @@
+#include "libc6.symbols.common"
+ld-linux.so.2 #PACKAGE# (>= 2.6), #PACKAGE# #MINVER#
+#include "symbols.wildcards"
+libc.so.6 #PACKAGE# (>= 2.6), #PACKAGE# #MINVER#
+#include "symbols.wildcards"
+

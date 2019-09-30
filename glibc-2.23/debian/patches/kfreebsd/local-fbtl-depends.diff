@@ -1,0 +1,18 @@
+--- a/nscd/Depend
++++ b/nscd/Depend
+@@ -1,2 +1,3 @@
+ nptl
+ libpthread
++fbtl
+--- a/resolv/Depend
++++ b/resolv/Depend
+@@ -1,2 +1,3 @@
+ nptl
+ libpthread
++fbtl
+--- a/rt/Depend
++++ b/rt/Depend
+@@ -1,2 +1,3 @@
+ nptl
+ libpthread
++fbtl

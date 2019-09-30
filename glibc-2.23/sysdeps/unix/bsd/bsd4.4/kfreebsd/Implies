@@ -1,0 +1,11 @@
+# The kernel include files come from the 'kernel-include' add-on.
+# This is actually added by configure.in.
+#/usr/src/sys/
+
+# One of two possible utmp file formats.
+# This is actually added by configure.in.
+#unix/bsd/bsd4.4/kfreebsd/utmp-xyz
+
+# The gnu subdirectory exists for things common to Linux-based, Hurd-based
+# and kFreeBSD-based GNU systems.
+gnu

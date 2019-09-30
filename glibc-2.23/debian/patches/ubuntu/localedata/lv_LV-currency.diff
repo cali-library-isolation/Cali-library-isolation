@@ -1,0 +1,37 @@
+Description: Changed to currency EUR/‬€
+Bug-Ubuntu: https://launchpad.net/bugs/1264551
+Forwarded: https://sourceware.org/bugzilla/show_bug.cgi?id=16374
+Author: Gunnar Hjalmarsson <gunnarhj@ubuntu.com>
+
+--- a/localedata/locales/lv_LV	2012-03-06 10:10:19.000000000 +0100
++++ b/localedata/locales/lv_LV	2014-09-28 22:37:43.021365004 +0200
+@@ -2122,8 +2122,10 @@
+ END LC_CTYPE
+ 
+ LC_MONETARY
+-int_curr_symbol   "<U004C><U0056><U004C><U0020>"
+-currency_symbol   "<U004C><U0073>"
++% EUR
++int_curr_symbol   "<U0045><U0055><U0052><U0020>"
++% €
++currency_symbol   "<U20AC>"
+ mon_decimal_point "<U002C>"
+ mon_thousands_sep "<U00A0>"
+ mon_grouping      3;3
+@@ -2131,12 +2133,12 @@
+ negative_sign     "<U002D>"
+ int_frac_digits   2
+ frac_digits       2
+-p_cs_precedes     1
++p_cs_precedes     0
+ p_sep_by_space    1
+-n_cs_precedes     1
++n_cs_precedes     0
+ n_sep_by_space    1
+-p_sign_posn       3
+-n_sign_posn       3
++p_sign_posn       1
++n_sign_posn       1
+ END LC_MONETARY
+ 
+ LC_NUMERIC

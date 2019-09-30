@@ -1,0 +1,253 @@
+Subject: [PATCH] hurd: SCM_CREDS support
+
+Svante Signell  <svante.signell@gmail.com>
+Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	* sysdeps/mach/hurd/sendmsg.c (__libc_sendmsg): On SCM_CREDS
+	control messages, record uids, pass a rendez-vous port in the
+	control message, and call __auth_user_authenticate_request to
+	make auth send credentials on that port.  Do not wait for a
+	reply.
+	* sysdeps/mach/hurd/recvmsg.c (contains_uid, contains_gid,
+	check_auth): New functions.
+	(__libc_recvmsg): On SCM_CREDS control messages, call check_auth
+	to check the passed credentials thanks to the answer from the
+	auth server.
+	* hurd/Makefile (user-interfaces): Add auth_request and
+	auth_reply.
+
+---
+ hurd/Makefile               |   2 +-
+ sysdeps/mach/hurd/recvmsg.c | 137 ++++++++++++++++++++++++++++++++++++++++++++
+ sysdeps/mach/hurd/sendmsg.c |  34 +++++++++++
+ 3 files changed, 172 insertions(+), 1 deletion(-)
+
+diff --git a/sysdeps/mach/hurd/recvmsg.c b/sysdeps/mach/hurd/recvmsg.c
+index 0200b13..b66e5b5 100644
+--- a/sysdeps/mach/hurd/recvmsg.c
++++ b/sysdeps/mach/hurd/recvmsg.c
+@@ -23,6 +23,123 @@
+ #include <hurd/fd.h>
+ #include <hurd/socket.h>
+ 
++static unsigned
++contains_uid (unsigned int n, __uid_t uids[n], __uid_t uid)
++{
++  unsigned i;
++
++  for (i = 0; i < n; i++)
++    if (uids[i] == uid)
++      return 1;
++  return 0;
++}
++
++static unsigned
++contains_gid (unsigned int n, __gid_t gids[n], __gid_t gid)
++{
++  unsigned i;
++
++  for (i = 0; i < n; i++)
++    if (gids[i] == gid)
++      return 1;
++  return 0;
++}
++
++/* Check the passed credentials.  */
++static error_t
++check_auth (mach_port_t rendezvous,
++		    __pid_t pid,
++		    __uid_t uid, __uid_t euid,
++		    __gid_t gid,
++		    int ngroups, __gid_t groups[ngroups])
++{
++  error_t err;
++  size_t neuids = CMGROUP_MAX, nauids = CMGROUP_MAX;
++  size_t negids = CMGROUP_MAX, nagids = CMGROUP_MAX;
++  __uid_t euids_buf[neuids], auids_buf[nauids];
++  __gid_t egids_buf[negids], agids_buf[nagids];
++  __uid_t *euids = euids_buf, *auids = auids_buf;
++  __gid_t *egids = egids_buf, *agids = agids_buf;
++
++  struct procinfo *pi = NULL;
++  mach_msg_type_number_t pi_size = 0;
++  int flags = PI_FETCH_TASKINFO;
++  char *tw = NULL;
++  size_t tw_size = 0;
++  unsigned i;
++
++  err = mach_port_mod_refs (mach_task_self (), rendezvous,
++			    MACH_PORT_RIGHT_SEND, 1);
++  if (err)
++    goto out;
++
++  do
++    err = __USEPORT
++      (AUTH, __auth_server_authenticate (port,
++					 rendezvous, MACH_MSG_TYPE_COPY_SEND,
++					 MACH_PORT_NULL, 0,
++					 &euids, &neuids, &auids, &nauids,
++					 &egids, &negids, &agids, &nagids));
++  while (err == EINTR);
++  if (err)
++    goto out;
++
++  /* Check whether this process indeed has these IDs */
++  if (   !contains_uid (neuids, euids,  uid)
++      && !contains_uid (nauids, auids,  uid)
++   ||    !contains_uid (neuids, euids, euid)
++      && !contains_uid (nauids, auids, euid)
++   ||    !contains_gid (negids, egids,  gid)
++      && !contains_gid (nagids, agids,  gid)
++    )
++    {
++      err = EIO;
++      goto out;
++    }
++
++  /* Check groups */
++  for (i = 0; i < ngroups; i++)
++    if (   !contains_gid (negids, egids, groups[i])
++	&& !contains_gid (nagids, agids, groups[i]))
++      {
++	err = EIO;
++	goto out;
++      }
++
++  /* Check PID  */
++  /* XXX: Using proc_getprocinfo until
++     proc_user_authenticate proc_server_authenticate is implemented
++  */
++  /* Get procinfo to check the owner.  Maybe he faked the pid, but at least we
++     check the owner.  */
++  err = __USEPORT (PROC, __proc_getprocinfo (port, pid, &flags,
++					     (procinfo_t *)&pi,
++					     &pi_size, &tw, &tw_size));
++  if (err)
++    goto out;
++
++  if (   !contains_uid (neuids, euids, pi->owner)
++      && !contains_uid (nauids, auids, pi->owner))
++    err = EIO;
++
++out:
++  mach_port_deallocate (mach_task_self (), rendezvous);
++  if (euids != euids_buf)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) euids, neuids * sizeof(uid_t));
++  if (auids != auids_buf)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) auids, nauids * sizeof(uid_t));
++  if (egids != egids_buf)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) egids, negids * sizeof(uid_t));
++  if (agids != agids_buf)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) agids, nagids * sizeof(uid_t));
++  if (tw_size)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) tw, tw_size);
++  if (pi_size)
++    __vm_deallocate (__mach_task_self(), (vm_address_t) pi, pi_size);
++
++  return err;
++}
++
+ /* Receive a message as described by MESSAGE from socket FD.
+    Returns the number of bytes read or -1 for errors.  */
+ ssize_t
+@@ -191,6 +308,21 @@ __libc_recvmsg (int fd, struct msghdr *message, int flags)
+ 	    newfds++;
+ 	  }
+       }
++    else if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDS)
++      {
++	/* SCM_CREDS support.  */
++	/* Check received credentials */
++	struct cmsgcred *ucredp = (struct cmsgcred *) CMSG_DATA(cmsg);
++
++	err = check_auth (ports[i],
++			  ucredp->cmcred_pid,
++			  ucredp->cmcred_uid, ucredp->cmcred_euid,
++			  ucredp->cmcred_gid,
++			  ucredp->cmcred_ngroups, ucredp->cmcred_groups);
++	if (err)
++	  goto cleanup;
++	i++;
++      }
+   }
+ 
+   for (i = 0; i < nports; i++)
+@@ -221,6 +353,11 @@ cleanup:
+ 		__mach_port_deallocate (__mach_task_self (), ports[ii]);
+ 	      }
+ 	    }
++	  else if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDS)
++	    {
++	      __mach_port_deallocate (__mach_task_self (), ports[ii]);
++	      ii++;
++	    }
+ 	}
+     }
+ 
+diff --git a/sysdeps/mach/hurd/sendmsg.c b/sysdeps/mach/hurd/sendmsg.c
+index 612581c..51167e8 100644
+--- a/sysdeps/mach/hurd/sendmsg.c
++++ b/sysdeps/mach/hurd/sendmsg.c
+@@ -111,6 +111,8 @@ __libc_sendmsg (int fd, const struct msghdr *message, int flags)
+     if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS)
+       nports += (cmsg->cmsg_len - CMSG_ALIGN (sizeof (struct cmsghdr)))
+ 		/ sizeof (int);
++    else if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDS)
++      nports++;
+ 
+   if (nports)
+     ports = __alloca (nports * sizeof (mach_port_t));
+@@ -145,6 +147,38 @@ __libc_sendmsg (int fd, const struct msghdr *message, int flags)
+ 		goto out;
+ 	    }
+ 	}
++      else if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDS)
++	{
++	  /* SCM_CREDS support: send credentials.   */
++	  mach_port_t rendezvous  = __mach_reply_port (), reply;
++	  struct cmsgcred *ucredp;
++
++	  err = mach_port_insert_right (mach_task_self (), rendezvous,
++					rendezvous, MACH_MSG_TYPE_MAKE_SEND);
++	  ports[nports++] = rendezvous;
++	  if (err)
++	    goto out;
++
++	  ucredp = (struct cmsgcred *) CMSG_DATA(cmsg);
++	  /* Fill in credentials data */
++	  ucredp->cmcred_pid = __getpid();
++	  ucredp->cmcred_uid = __getuid();
++	  ucredp->cmcred_euid = __geteuid();
++	  ucredp->cmcred_gid = __getgid();
++	  ucredp->cmcred_ngroups =
++	    __getgroups (sizeof (ucredp->cmcred_groups) / sizeof (gid_t),
++			 ucredp->cmcred_groups);
++
++	  /* And make auth server authenticate us.  */
++	  reply = __mach_reply_port();
++	  err = __USEPORT
++	    (AUTH, __auth_user_authenticate_request (port,
++					reply, MACH_MSG_TYPE_MAKE_SEND_ONCE,
++					rendezvous, MACH_MSG_TYPE_MAKE_SEND));
++	  mach_port_deallocate (__mach_task_self (), reply);
++	  if (err)
++	    goto out;
++	}
+     }
+ 
+   if (addr)
+diff --git a/hurd/Makefile b/hurd/Makefile
+index 4387253..0ee417d 100644
+--- a/hurd/Makefile
++++ b/hurd/Makefile
+@@ -33,7 +33,7 @@ inline-headers = hurd.h $(addprefix hurd/,fd.h signal.h \
+ # The RPC interfaces go in a separate library.
+ interface-library := libhurduser
+ user-interfaces		:= $(addprefix hurd/,\
+-				       auth startup \
++				       auth auth_request auth_reply startup \
+ 				       process process_request \
+ 				       msg msg_reply msg_request \
+ 				       exec exec_startup crash interrupt \
+-- 
+tg: (511e7f1..) t/sendmsg-SCM_CREDS (depends on: t/sendmsg-SCM_RIGHTS)

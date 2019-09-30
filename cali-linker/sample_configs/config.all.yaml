@@ -1,0 +1,50 @@
+---
+
+linkerOverride: false
+addLibstdc++: false
+writeGraphs: false
+writeGraphsDot: false
+
+limit_subnode_depth: 3
+limit_struct_parts: 32
+strongFDAnalysis: false
+filedescriptors: {}  # Map ["function name" => argument number] to support FD detection
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+      - "libstdc++.a"
+  library:
+    selectors:
+      - "libabc.so"
+    permissions:
+      readonly:
+        - /bin
+        - /lib64
+        - /dev/urandom
+      readwrite:
+        - "$HOME/.config/abc"
+        - "$ARGV"
+      tmpfs:
+        - /dev/random_tmpfs
+      user: 65534  # = nobody
+      group: 65534  # = nogroup
+      network: local  # all/host, local, none
+      seccomp: |
+        DEFAULT ALLOW
+      max_cpus: 0  # 0 = all
+      capabilities: []  # list of capabilities that are retained / not dropped
+      silent: false
+      rlimit:
+        as: ""  # address space in MB
+        core: ""  # core file size in MB
+        cpu: ""  # CPU time in sec
+        fsize: ""  # File size in MB
+        nofile: ""  # number of open FDs
+        nproc: ""  # number of PIDs
+        stack: ""  # stack size in MB
+      cgroup_mem_max: 0
+      cgroup_pids_max: 0
+      cgroup_cpu_ms_per_sec: 0

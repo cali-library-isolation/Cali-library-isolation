@@ -1,0 +1,17 @@
+
+AT_EXECFN is Linux specific
+
+--- a/elf/rtld.c
++++ b/elf/rtld.c
+@@ -1119,9 +1119,11 @@
+ 	  case AT_ENTRY:
+ 	    av->a_un.a_val = *user_entry;
+ 	    break;
++# ifdef AT_EXECFN	    
+ 	  case AT_EXECFN:
+ 	    av->a_un.a_val = (uintptr_t) _dl_argv[0];
+ 	    break;
++# endif	    
+ 	  }
+ #endif
+     }

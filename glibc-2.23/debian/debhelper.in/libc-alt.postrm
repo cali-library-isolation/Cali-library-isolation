@@ -1,0 +1,21 @@
+#! /bin/sh
+set -e
+
+if [ "$1" = remove ]; then
+    # Native multiarch packages declare a Replaces: on the corresponding
+    # biarch package. Therefore if both a biarch package and the corresponding
+    # multiarch package are installed, then the multiarch package is removed,
+    # and then the biarch package is removed, the dynamic linker symlink
+    # becomes a dangling symlink. Remove it in that case.
+    if [ -h RTLD_SO ] && [ ! -f RTLD_SO ]; then
+        rm RTLD_SO
+    fi
+fi
+
+if [ "$1" = deconfigure ]; then
+    :; # blah, do something useful with ldso
+fi
+
+#DEBHELPER#
+
+exit 0

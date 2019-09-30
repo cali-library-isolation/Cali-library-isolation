@@ -1,0 +1,395 @@
+# DP: Description: libgcc-compat symbols for i386, sparc, 
+#                  alpha, ia64 (derived from RedHat's), s390
+# DP: Author: Guido Guenther, GOTO Masanori
+# DP: Upstream status: Not submitted
+# DP: Date: 2002-10-13, updated 2006-05-28
+
+---
+ sysdeps/i386/Makefile                 |    8 ++
+ sysdeps/i386/Versions                 |    3 
+ sysdeps/i386/libgcc-compat.c          |   75 +++++++++++++++++++++
+ sysdeps/s390/s390-32/Makefile         |    8 ++
+ sysdeps/s390/s390-32/Versions         |    8 ++
+ sysdeps/s390/s390-32/libgcc-compat.c  |   83 +++++++++++++++++++++++
+ sysdeps/sparc/sparc32/Makefile        |    8 ++
+ sysdeps/sparc/sparc32/Versions        |    4 +
+ sysdeps/sparc/sparc32/libgcc-compat.c |  121 ++++++++++++++++++++++++++++++++++
+ 9 files changed, 318 insertions(+)
+
+--- /dev/null
++++ b/sysdeps/i386/libgcc-compat.c
+@@ -0,0 +1,75 @@
++/* pre-.hidden libgcc compatibility
++   Copyright (C) 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Guido Guenther <agx@sigxcpu.org>
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++#include <stdint.h>
++#include <shlib-compat.h>
++
++#if SHLIB_COMPAT(libc, GLIBC_2_0, GLIBC_2_2_6)
++
++extern int32_t __cmpdi2 (int64_t, int64_t);
++int32_t __cmpdi2_internal (int64_t u, int64_t v)
++{
++  return __cmpdi2 (u, v);
++}
++symbol_version (__cmpdi2_internal, __cmpdi2, GLIBC_2.0);
++
++
++extern int32_t __ucmpdi2 (int64_t, int64_t);
++int32_t __ucmpdi2_internal (int64_t u, int64_t v)
++{
++  return __ucmpdi2 (u, v);
++}
++symbol_version (__ucmpdi2_internal, __ucmpdi2, GLIBC_2.0);
++
++
++extern int64_t __fixunsdfdi (double);
++int64_t __fixunsdfdi_internal (double d)
++{
++	  return __fixunsdfdi (d);
++}
++symbol_version (__fixunsdfdi_internal, __fixunsdfdi, GLIBC_2.0);
++
++extern int64_t __fixunssfdi (float);
++int64_t __fixunssfdi_internal (float d)
++{
++  return __fixunssfdi (d);
++}
++
++symbol_version (__fixunsfdi_internal, __fixunsfdi, GLIBC_2.0);
++
++typedef float XFtype __attribute__ ((mode (XF)));
++
++extern int64_t __fixunsxfdi (XFtype);
++int64_t __fixunsxfdi_internal (XFtype d)
++{
++  return __fixunsxfdi (d);
++}
++
++symbol_version (__fixunsxfdi_internal, __fixunsxfdi, GLIBC_2.0);
++
++extern double __floatdidf (int64_t);
++double __floatdidf_internal (int64_t u)
++{
++	  return __floatdidf (u);
++}
++symbol_version (__floatdidf_internal, __floatdidf, GLIBC_2.0);
++
++#endif
+--- a/sysdeps/i386/Makefile
++++ b/sysdeps/i386/Makefile
+@@ -9,6 +9,14 @@
+ sysdep_routines += cacheinfo
+ endif
+ 
++ifeq ($(subdir),csu)
++ifeq (yes,$(build-shared))
++# Compatibility
++sysdep_routines += libgcc-compat
++shared-only-routines += libgcc-compat
++endif
++endif
++
+ ifeq ($(subdir),gmon)
+ sysdep_routines += i386-mcount
+ endif
+--- a/sysdeps/i386/Versions
++++ b/sysdeps/i386/Versions
+@@ -8,6 +8,9 @@
+   GLIBC_2.0 {
+     # Functions from libgcc.
+     __divdi3; __moddi3; __udivdi3; __umoddi3;
++    __cmpdi2; __ucmpdi2;
++    __fixunsdfdi; __fixunssfdi; __fixunsxfdi;
++    __floatdidf;
+   }
+   GLIBC_2.1 {
+     # global variable
+--- /dev/null
++++ b/sysdeps/sparc/sparc32/libgcc-compat.c
+@@ -0,0 +1,121 @@
++/* pre-.hidden libgcc compatibility
++   Copyright (C) 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Guido Guenther <agx@sigxcpu.org>
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++#include <stdint.h>
++#include <shlib-compat.h>
++
++#if SHLIB_COMPAT(libc, GLIBC_2_0, GLIBC_2_2_6)
++
++extern int64_t __ashldi3 (int64_t, int32_t);
++int64_t __ashldi3_internal (int64_t u, int32_t b)
++{
++  return __ashldi3 (u, b);
++}
++symbol_version (__ashldi3_internal, __ashldi3, GLIBC_2.0);
++
++
++extern int64_t __ashrdi3 (int64_t, int32_t);
++int64_t __ashrdi3_internal (int64_t u, int32_t b)
++{
++  return __ashrdi3 (u, b);
++}
++symbol_version (__ashrdi3_internal, __ashrdi3, GLIBC_2.0);
++
++
++extern int64_t __lshrdi3 (int64_t, int32_t);
++int64_t __lshrdi3_internal (int64_t u, int32_t b)
++{
++  return __lshrdi3 (u, b);
++}
++symbol_version (__lshrdi3_internal, __lshrdi3, GLIBC_2.0);
++
++extern int32_t __cmpdi2 (int64_t, int64_t);
++int32_t __cmpdi2_internal (int64_t u, int64_t v)
++{
++  return __cmpdi2 (u, v);
++}
++symbol_version (__cmpdi2_internal, __cmpdi2, GLIBC_2.0);
++
++
++extern int32_t __ucmpdi2 (int64_t, int64_t);
++int32_t __ucmpdi2_internal (int64_t u, int64_t v)
++{
++  return __ucmpdi2 (u, v);
++}
++symbol_version (__ucmpdi2_internal, __ucmpdi2, GLIBC_2.0);
++
++
++extern int64_t __fixdfdi (double);
++int64_t __fixdfdi_internal (double d)
++{
++  return __fixdfdi (d);
++}
++symbol_version (__fixdfdi_internal, __fixdfdi, GLIBC_2.0);
++
++
++extern int64_t __fixsfdi (float);
++int64_t __fixsfdi_internal (float d)
++{
++  return __fixsfdi (d);
++}
++symbol_version (__fixsfdi_internal, __fixsfdi, GLIBC_2.0);
++
++
++extern int64_t __fixunsdfdi (double);
++int64_t __fixunsdfdi_internal (double d)
++{
++	  return __fixunsdfdi (d);
++}
++symbol_version (__fixunsdfdi_internal, __fixunsdfdi, GLIBC_2.0);
++
++extern int64_t __fixunssfdi (float);
++int64_t __fixunssfdi_internal (float d)
++{
++  return __fixunssfdi (d);
++}
++
++symbol_version (__fixunssfdi_internal, __fixunssfdi, GLIBC_2.0);
++
++
++extern double __floatdidf (int64_t);
++double __floatdidf_internal (int64_t u)
++{
++	  return __floatdidf (u);
++}
++symbol_version (__floatdidf_internal, __floatdidf, GLIBC_2.0);
++
++
++extern float __floatdisf (int64_t);
++float __floatdisf_internal (int64_t u)
++{
++  return __floatdisf (u);
++}
++symbol_version (__floatdisf_internal, __floatdisf, GLIBC_2.0);
++
++
++extern int64_t __muldi3 (int64_t, int64_t);
++int64_t __muldi3_internal (int64_t u, int64_t v)
++{
++  return __muldi3 (u, v);
++}
++symbol_version (__muldi3_internal, __muldi3, GLIBC_2.0);
++
++#endif
+--- a/sysdeps/sparc/sparc32/Makefile
++++ b/sysdeps/sparc/sparc32/Makefile
+@@ -19,6 +19,14 @@
+ sysdep_routines = dotmul umul $(divrem) alloca
+ endif	# gnulib
+ 
++ifeq ($(subdir),csu)
++ifeq (yes,$(build-shared))
++# Compatibility
++sysdep_routines += libgcc-compat
++shared-only-routines += libgcc-compat
++endif
++endif
++
+ # We distribute these files, even though they are generated,
+ # so as to avoid the need for a functioning m4 to build the library.
+ divrem := sdiv udiv rem urem
+--- a/sysdeps/sparc/sparc32/Versions
++++ b/sysdeps/sparc/sparc32/Versions
+@@ -1,6 +1,10 @@
+ libc {
+   GLIBC_2.0 {
+     .div; .mul; .rem; .udiv; .umul; .urem;
++    __divdi3; __moddi3; __udivdi3; __umoddi3; __muldi3;
++    __ashldi3; __ashrdi3; __lshrdi3; __cmpdi2; __ucmpdi2;
++    __fixdfdi; __fixsfdi; __fixunsdfdi; __fixunssfdi;
++    __floatdidf; __floatdisf;
+   }
+ }
+ libm {
+--- a/sysdeps/s390/s390-32/Makefile
++++ b/sysdeps/s390/s390-32/Makefile
+@@ -9,3 +9,11 @@
+ CFLAGS-dl-load.c += -Wno-unused
+ CFLAGS-dl-reloc.c += -Wno-unused
+ endif
++
++ifeq ($(subdir),csu)
++ifeq (yes,$(build-shared))
++# Compatibility
++sysdep_routines += libgcc-compat
++shared-only-routines += libgcc-compat
++endif
++endif
+--- a/sysdeps/s390/s390-32/Versions
++++ b/sysdeps/s390/s390-32/Versions
+@@ -2,5 +2,13 @@
+   GLIBC_2.0 {
+     # Functions from libgcc.
+     __divdi3; __moddi3; __udivdi3; __umoddi3;
++    __cmpdi2;
++    __fixdfdi;
++    __fixsfdi;
++    __fixunsdfdi;
++    __fixunssfdi;
++    __floatdidf;
++    __floatdisf;
++    __ucmpdi2;
+   }
+ }
+--- /dev/null
++++ b/sysdeps/s390/s390-32/libgcc-compat.c
+@@ -0,0 +1,83 @@
++/* pre-.hidden libgcc compatibility
++   Copyright (C) 2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by GOTO Masanori <gotom@debian.org>
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++
++#include <stdint.h>
++#include <shlib-compat.h>
++
++#if SHLIB_COMPAT(libc, GLIBC_2_0, GLIBC_2_2_6)
++
++extern int32_t __cmpdi2 (int64_t, int64_t);
++int32_t __cmpdi2_internal (int64_t u, int64_t v)
++{
++  return __cmpdi2 (u, v);
++}
++symbol_version (__cmpdi2_internal, __cmpdi2, GLIBC_2.0);
++
++extern int64_t __fixdfdi (double);
++int64_t __fixdfdi_internal (double d)
++{
++  return __fixdfdi (d);
++}
++symbol_version (__fixdfdi_internal, __fixdfdi, GLIBC_2.0);
++
++extern int64_t __fixsfdi (float);
++int64_t __fixsfdi_internal (float d)
++{
++  return __fixsfdi (d);
++}
++symbol_version (__fixsfdi_internal, __fixsfdi, GLIBC_2.0);
++
++extern int64_t __fixunsdfdi (double);
++int64_t __fixunsdfdi_internal (double d)
++{
++  return __fixunsdfdi (d);
++}
++symbol_version (__fixunsdfdi_internal, __fixunsdfdi, GLIBC_2.0);
++
++extern int64_t __fixunssfdi (float);
++int64_t __fixunssfdi_internal (float d)
++{
++  return __fixunssfdi (d);
++}
++symbol_version (__fixunssfdi_internal, __fixunssfdi, GLIBC_2.0);
++
++extern double __floatdidf (int64_t);
++double __floatdidf_internal (int64_t u)
++{
++  return __floatdidf (u);
++}
++symbol_version (__floatdidf_internal, __floatdidf, GLIBC_2.0);
++
++extern float __floatdisf (int64_t);
++float __floatdisf_internal (int64_t u)
++{
++  return __floatdisf (u);
++}
++symbol_version (__floatdisf_internal, __floatdisf, GLIBC_2.0);
++
++extern int32_t __ucmpdi2 (int64_t, int64_t);
++int32_t __ucmpdi2_internal (int64_t u, int64_t v)
++{
++  return __ucmpdi2 (u, v);
++}
++symbol_version (__ucmpdi2_internal, __ucmpdi2, GLIBC_2.0);
++
++#endif

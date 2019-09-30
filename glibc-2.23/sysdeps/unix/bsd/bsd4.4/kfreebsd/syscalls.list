@@ -1,0 +1,214 @@
+# File name		Caller	Syscall name		# args		Strong name	Weak names
+accept4			-	accept4			Ci:iBNi		accept4
+sys_access		-	access			i:si		__syscall_access
+acl_aclcheck_fd		-	acl_aclcheck_fd		i:iip		__acl_aclcheck_fd
+acl_aclcheck_file	-	acl_aclcheck_file	i:sip		__acl_aclcheck_file
+acl_delete_fd		-	acl_delete_fd		i:ii		__acl_delete_fd
+acl_delete_file		-	acl_delete_file		i:si		__acl_delete_file
+acl_get_fd		-	acl_get_fd		i:iip		__acl_get_fd
+acl_get_file		-	acl_get_file		i:sip		__acl_get_file
+acl_set_fd		-	acl_set_fd		i:iip		__acl_set_fd
+acl_set_file		-	acl_set_file		i:sip		__acl_set_file
+sys_aio_cancel		-	aio_cancel		i:ip		__syscall_aio_cancel
+sys_aio_error		-	aio_error		i:p		__syscall_aio_error
+sys_aio_read		-	aio_read		i:p		__syscall_aio_read
+sys_aio_return		-	aio_return		i:p		__syscall_aio_return
+sys_aio_suspend		-	aio_suspend		i:bnP		__syscall_aio_suspend
+sys_aio_waitcomplete	-	aio_waitcomplete	i:pp		__syscall_aio_waitcomplete
+sys_aio_write		-	aio_write		i:p		__syscall_aio_write
+sys_bind		-	bind			i:ipi		__syscall_bind
+sys_clock_getcpuclockid2  -     clock_getcpuclockid2    Vi:iip		__syscall_clock_getcpuclockid2
+sys_clock_getres	-	clock_getres		i:ip		__syscall_clock_getres
+sys_clock_gettime	-	clock_gettime		i:ip		__syscall_clock_gettime
+sys_clock_settime	-	clock_settime		i:ip		__syscall_clock_settime
+sys_close		-	close			i:i		__syscall_close
+sys_closefrom		EXTRA	closefrom		i:i		__syscall_closefrom
+sys_connect		-	connect			i:ipi		__syscall_connect
+sys_cpuset_getaffinity	-	cpuset_getaffinity	i:iiiip		__syscall_cpuset_getaffinity
+sys_cpuset_setaffinity	-	cpuset_setaffinity	i:iiiip		__syscall_cpuset_setaffinity
+execve			-	execve			i:spp		__execve execve
+extattr_delete_file	-	extattr_delete_file	i:ss		extattr_delete_file
+extattr_get_file	-	extattr_get_file	i:ssbn		extattr_get_file
+extattr_set_file	-	extattr_set_file	i:ssbn		extattr_set_file
+extattrctl		-	extattrctl		i:sisI		extattrctl
+sys_faccessat		-	faccessat		i:isii		__syscall_faccessat
+fchmodat		-	fchmodat		i:isii		fchmodat
+fchownat		-	fchownat		i:isiii		fchownat
+sys_fcntl		-	fcntl			i:iiF		__syscall_fcntl
+fexecve			-	fexecve			i:ipp		fexecve
+fhopen			-	fhopen			i:pi		fhopen
+sys_fhstat		-	fhstat			i:pp		__syscall_fhstat
+sys_fhstatfs		-	fhstatfs		i:pp		__syscall_fhstatfs
+sys_fork		-	fork			i:		__syscall_fork	fork
+sys_fstat		-	fstat			i:ip		__syscall_fstat
+sys_fstatat		-	fstatat			i:ispi		__syscall_fstatat
+sys_fstatfs		-	fstatfs			i:ip		__syscall_fstatfs
+ftruncate		-	ftruncate		i:ii		__ftruncate !__ftruncate64 ftruncate ftruncate64
+futimes			-	futimes			i:ip		__futimes futimes
+sys_futimesat		-	futimesat		i:isp		__syscall_futimesat
+getcontext		-	getcontext		i:p		__getcontext getcontext
+sys_getcwd		-	getcwd			i:bn		__syscall_getcwd
+sys_getdents		-	getdents		i:ibn		__syscall_getdents getdents
+sys_getdirentries	-	getdirentries		i:ibnP		__syscall_getdirentries
+getegid			-	getegid			i:		__getegid getegid
+geteuid			-	geteuid			i:		__geteuid geteuid
+getfh			-	getfh			i:sp		getfh
+sys_getfsstat		-	getfsstat		i:pii		__syscall_getfsstat
+sys_getlogin		-	getlogin		i:bn		__syscall_getlogin
+getpgid			-	getpgid			i:i		__getpgid __getpgid_internal getpgid
+getpgrp			-	getpgrp			i:		getpgrp
+getppid			-	getppid			i:		__getppid getppid
+getresgid		-	getresgid		i:ppp		getresgid
+getresuid		-	getresuid		i:ppp		getresuid
+getrlimit		-	getrlimit		i:ip		__getrlimit getrlimit getrlimit64 __getrlimit64
+getsid			-	getsid			i:i		getsid
+issetugid		-	issetugid		i:		issetugid
+jail			-	jail			i:p		jail
+jail_attach		-	jail_attach		i:i		jail_attach
+jail_get		-	jail_get		i:pii		jail_get
+jail_remove		-	jail_remove		i:i		jail_remove
+jail_set		-	jail_set		i:pii		jail_set
+kenv			-	kenv			i:issi		kenv
+kevent			EXTRA	kevent			i:ipipip	__kevent kevent
+kldfind			-	kldfind			i:s		kldfind
+kldfirstmod		-	kldfirstmod		i:i		kldfirstmod
+kldload			-	kldload			i:s		kldload
+kldnext			-	kldnext			i:i		kldnext
+kldstat			-	kldstat			i:ip		kldstat
+kldsym			-	kldsym			i:iip		kldsym
+kldunload		-	kldunload		i:i		kldunload
+kldunloadf		-	kldunloadf		i:ii		kldunloadf
+kqueue			EXTRA	kqueue			i:		__kqueue kqueue
+sys_ktimer_create	-	ktimer_create		i:iPp		__syscall_ktimer_create
+sys_ktimer_delete	-	ktimer_delete		i:i		__syscall_ktimer_delete
+sys_ktimer_getoverrun	-	ktimer_getoverrun	i:i		__syscall_ktimer_getoverrun
+sys_ktimer_gettime	-	ktimer_gettime		i:ip		__syscall_ktimer_gettime
+sys_ktimer_settime	-	ktimer_settime		i:iipp		__syscall_ktimer_settime
+ktrace			-	ktrace			i:siii		ktrace
+lchflags		-	lchflags		i:si		lchflags
+lchmod			-	lchmod			i:si		__lchmod lchmod
+lchown			-	lchown			i:sii		__lchown lchown
+linkat			-	linkat			i:isisi		linkat
+sys_lio_listio		-	lio_listio		i:ibnP		__syscall_lio_listio
+lseek			-	lseek			i:iii		__libc_lseek !__lseek  lseek !__libc_lseek64 !__lseek64 lseek64 !__llseek llseek
+sys_lstat		-	lstat			i:sp		__syscall_lstat
+lutimes			-	lutimes			i:sp		__lutimes lutimes
+posix_madvise		-	madvise			i:pii		posix_madvise
+mincore			-	mincore			i:anV		mincore
+minherit		-	minherit		i:aii		minherit
+mkdirat			-	mkdirat			i:isi		mkdirat
+mkfifo			-	mkfifo			i:si		__mkfifo mkfifo
+sys_mkfifoat		-	mkfifoat		i:isi		__syscall_mkfifoat
+sys_mknod		-	mknod			i:sii		__syscall_mknod
+sys_mknodat		-	mknodat			i:isii		__syscall_mknodat
+mlock			-	mlock			i:bn		mlock
+mlockall		-	mlockall		i:i		mlockall
+sys_mmap		-	mmap			b:aniiii	__syscall_mmap
+modfind			-	modfind			i:s		modfind
+modfnext		-	modfnext		i:i		modfnext
+modnext			-	modnext			i:i		modnext
+modstat			-	modstat			i:ip		modstat
+mount			-	mount			i:ssiP		mount
+sys_msgctl		-	msgctl			i:iip		__syscall_msgctl
+msgget			-	msgget			i:ii		msgget
+msgrcv			-	msgrcv			Ci:ibnii	__libc_msgrcv msgrcv
+msgsnd			-	msgsnd			Ci:ibni		__libc_msgsnd msgsnd
+munlock			-	munlock			i:ai		munlock
+munlockall		-	munlockall		i:		munlockall
+sys_munmap		-	munmap			i:pi		__syscall_munmap
+nanosleep		-	nanosleep		Ci:pp		__libc_nanosleep __nanosleep nanosleep
+sys_nanosleep		EXTRA	nanosleep		i:pp		__syscall_nanosleep
+nfssvc			-	nfssvc			i:ip		nfssvc
+sys_nfstat		-	nfstat			i:ip		__syscall_nfstat
+nlm_syscall		-	nlm_syscall		i:iiip		nlm_syscall
+sys_nlstat		-	nlstat			i:sp		__syscall_nlstat
+nmount			-	nmount			i:pii		nmount
+sys_nstat		-	nstat			i:sp		__syscall_nstat
+ntp_adjtime		-	ntp_adjtime		i:p		ntp_adjtime
+ntp_gettime		-	ntp_gettime		i:p		ntp_gettime
+obreak			-	obreak			i:a		__syscall_obreak
+sys_open		-	open			i:siv		__syscall_open
+sys_openat		-	openat			i:isii		__syscall_openat !__openat_nocancel  !__openat64_nocancel
+poll			-	poll			Ci:pii		__poll poll
+sys_posix_fadvise	EXTRA	posix_fadvise		i:iiii		__syscall_posix_fadvise
+sys_posix_fallocate	EXTRA	posix_fallocate		i:iii		__syscall_posix_fallocate
+posix_openpt		getpt	posix_openpt		i:i		__syscall_posix_openpt
+pread			-	pread			Ci:ibni		__libc_pread !__pread pread !__libc_pread64 !__pread64 pread64
+preadv			-	preadv			Ci:ipii		__preadv  preadv  __preadv64  preadv64 
+pselect			-	pselect			Ci:iPPPPP	__pselect !__libc_pselect pselect
+pwrite			-	pwrite			Ci:ibni		__libc_pwrite !__pwrite pwrite !__libc_pwrite64 !__pwrite64 pwrite64
+pwritev			-	pwritev			Ci:ipii		__pwritev pwritev __pwritev64 pwritev64 
+quotactl		-	quotactl		i:siip		quotactl
+sys_read		-	read			i:ibn		__syscall_read
+readlink		-	readlink       		i:spi   	__syscall_readlink __readlink readlink
+readlinkat		-	readlinkat		i:issi		readlinkat
+sys_readv		-	readv			i:ipi		__syscall_readv
+renameat		-	renameat		i:isis		renameat
+rfork			-	rfork			i:i		__rfork rfork
+rtprio			-	rtprio			i:iip		__rtprio rtprio
+sched_primax		-	sched_get_priority_max	i:i		__sched_get_priority_max sched_get_priority_max
+sched_primin		-	sched_get_priority_min	i:i		__sched_get_priority_min sched_get_priority_min
+sched_gets		-	sched_getscheduler	i:i		__sched_getscheduler sched_getscheduler
+sched_rr_gi		-	sched_rr_get_interval	i:ip		__sched_rr_get_interval sched_rr_get_interval
+sched_setp		-	sched_setparam		i:ip		__sched_setparam sched_setparam
+sched_sets		-	sched_setscheduler	i:iip		__sched_setscheduler sched_setscheduler
+sched_yield		-	sched_yield		i:		__sched_yield sched_yield
+sys_semctl		-	semctl			i:iiip		__syscall_semctl
+semget			-	semget			i:iii		semget
+semop			-	semop			i:ipi		semop
+bsd_sendfile		-	sendfile		i:iiiippi	bsd_sendfile
+sys_sendto		-	sendto			i:ibnibn	__syscall_sendto
+setcontext		-	setcontext		i:p		__setcontext setcontext
+setegid			-	setegid			i:i		setegid
+seteuid			-	seteuid			i:i		seteuid
+setgid			-	setgid			i:i		__setgid setgid
+sys_setlogin		-	setlogin		i:s		__syscall_setlogin
+setpgid			-	setpgid			i:ii		__setpgid setpgid
+setresgid		-	setresgid		i:iii		setresgid
+setresuid		-	setresuid		i:iii		setresuid
+setrlimit		-	setrlimit		i:ip		__setrlimit setrlimit setrlimit64
+setsid			-	setsid			i:		__setsid setsid
+setuid			-	setuid			i:i		__setuid setuid
+sys_shm_open		-	shm_open		i:sii		__syscall_shm_open
+shm_unlink		-	shm_unlink		i:s		shm_unlink
+shmat			-	shmat			i:iai		shmat
+sys_shmctl		-	shmctl			i:iip		__syscall_shmctl
+shmdt			-	shmdt			i:a		shmdt
+shmget			-	shmget			i:iii		shmget
+sys_sigaction		-	sigaction		i:ipp		__syscall_sigaction
+sigpending		-	sigpending		i:p		sigpending
+sys_sigprocmask		EXTRA	sigprocmask		Vi:iPP		__syscall_sigprocmask
+sigprocmask		-	sigprocmask		i:iPP		__sigprocmask sigprocmask
+sigqueue		-	sigqueue		i:iii		__sigqueue sigqueue
+sigsuspend		-	sigsuspend		Ci:p		__sigsuspend sigsuspend
+sys_sigsuspend		EXTRA	sigsuspend		i:p		__syscall_sigsuspend
+sigtimedwait		-	sigtimedwait		Ci:ppP		__sigtimedwait sigtimedwait
+sys_sigtimedwait	-	sigtimedwait		i:ppP		__syscall_sigtimedwait
+sys_sigwait		-	sigwait			i:pp		__syscall_sigwait
+sigwaitinfo		-	sigwaitinfo		Ci:pp		__sigwaitinfo sigwaitinfo
+sys_sigwaitinfo		-	sigwaitinfo		i:pp		__syscall_sigwaitinfo
+sys_stat		-	stat			i:sp		__syscall_stat
+sys_statfs		-	statfs			i:sp		__syscall_statfs
+swapcontext		-	swapcontext		i:pp		__swapcontext swapcontext
+swapoff			-	swapoff			i:s		swapoff
+swapon			-	swapon			i:s		swapon
+symlinkat		-	symlinkat		i:sis		symlinkat
+sysarch			-	sysarch			i:ip		__sysarch sysarch
+sysctl			-	sysctl			i:pibNbn	__sysctl sysctl
+sys_thr_exit		-	thr_exit		Vi:P		__syscall_thr_exit
+sys_thr_kill		-	thr_kill		Vi:ii		__syscall_thr_kill
+sys_thr_kill2		-	thr_kill2		Vi:iii		__syscall_thr_kill2
+sys_thr_new		-	thr_new			Vi:pi		__syscall_thr_new
+sys_thr_self		-	thr_self		Vi:p		__syscall_thr_self
+sys_thr_set_name	-	thr_set_name		Vi:iP		__syscall_thr_set_name
+truncate		-	truncate		i:sii		__truncate !__truncate64 truncate truncate64
+sys_umtx		-	_umtx_op		Vi:piipp	__syscall__umtx_op
+undelete		-	undelete		i:s		undelete
+unlinkat		-	unlinkat		i:isi		unlinkat
+unmount			-	unmount			i:si		unmount
+utrace			-	utrace			i:bn		utrace
+wait4			-	wait4			i:iWiP		__syscall_wait4 __wait4	wait4
+sys_wait6		EXTRA	wait6			i:iiWiPP	__syscall_wait6
+sys_write		-	write			i:ibn		__syscall_write
+sys_writev		-	writev			i:ipi		__syscall_writev
+yield			-	yield			i:		__syscall_yield

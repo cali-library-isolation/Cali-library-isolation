@@ -1,0 +1,15 @@
+This dependency is missing, but would pose problem on Darwin
+
+diff --git a/sysdeps/mach/Makefile b/sysdeps/mach/Makefile
+index b47cdc6..3323e81 100644
+--- a/sysdeps/mach/Makefile
++++ b/sysdeps/mach/Makefile
+@@ -35,7 +35,7 @@ endif
+ # because it's different in Darwin and the conditional crap is
+ # too much trouble.  This should suffice for getting the mach/Makefile
+ # rules invoked when they need to be.
+-mach-before-compile := $(mach-objpfx)mach-shortcuts.h \
++mach-before-compile := $(mach-objpfx)mach-shortcuts.h $(mach-objpfx)mach/mach_interface.h \
+ 		       $(patsubst %,$(mach-objpfx)mach/mach_%.h,\
+ 				  port host)
+ 

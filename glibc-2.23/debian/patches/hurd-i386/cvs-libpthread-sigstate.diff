@@ -1,0 +1,57 @@
+commit 6106225fdc09f013ec4f7b1d7ec82780061c8a14
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Sun Jan 3 04:20:02 2016 +0100
+
+    Do not block unmaskable signals
+    
+    * sysdeps/mach/hurd/pt-sigstate.c (__pthread_sigstate): Always remove
+    _SIG_CANT_MASK from blocked signals, like sigprocmask does.
+
+--- a/libpthread/sysdeps/mach/hurd/pt-sigstate.c
++++ b/libpthread/sysdeps/mach/hurd/pt-sigstate.c
+@@ -43,24 +43,27 @@ __pthread_sigstate (struct __pthread *thread, int how,
+     *oset = ss->blocked;
+ 
+   if (set)
+-    switch (how)
+-      {
+-      case SIG_BLOCK:
+-	ss->blocked |= *set;
+-	break;
+-
+-      case SIG_SETMASK:
+-	ss->blocked = *set;
+-	break;
+-
+-      case SIG_UNBLOCK:
+-	ss->blocked &= ~*set;
+-	break;
+-
+-      default:
+-	err = EINVAL;
+-	break;
+-      }
++    {
++      switch (how)
++	{
++	case SIG_BLOCK:
++	  ss->blocked |= *set;
++	  break;
++
++	case SIG_SETMASK:
++	  ss->blocked = *set;
++	  break;
++
++	case SIG_UNBLOCK:
++	  ss->blocked &= ~*set;
++	  break;
++
++	default:
++	  err = EINVAL;
++	  break;
++	}
++      ss->blocked &= ~_SIG_CANT_MASK;
++    }
+ 
+   if (! err && clear_pending)
+     __sigemptyset (&ss->pending);

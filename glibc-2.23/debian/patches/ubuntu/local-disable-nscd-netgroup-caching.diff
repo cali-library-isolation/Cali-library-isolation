@@ -1,0 +1,13 @@
+--- eglibc-2.16.orig/nscd/nscd.conf
++++ eglibc-2.16/nscd/nscd.conf
+@@ -80,7 +80,9 @@
+ 	shared			services	yes
+ 	max-db-size		services	33554432
+ 
+-	enable-cache		netgroup	yes
++# netgroup caching is known-broken, so disable it in the default config,
++# see: https://bugs.launchpad.net/ubuntu/+source/eglibc/+bug/1068889
++	enable-cache		netgroup	no
+ 	positive-time-to-live	netgroup	28800
+ 	negative-time-to-live	netgroup	20
+ 	suggested-size		netgroup	211

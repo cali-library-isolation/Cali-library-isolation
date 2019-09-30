@@ -1,0 +1,46 @@
+---
+ math/Makefile |   20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+--- a/math/Makefile
++++ b/math/Makefile
+@@ -120,13 +120,17 @@
+ 	       test-signgam-uchar-static test-signgam-uchar-init-static \
+ 	       test-signgam-uint-static test-signgam-uint-init-static \
+ 	       test-signgam-ullong-static test-signgam-ullong-init-static
+-# We do the `long double' tests only if this data type is available and
+-# distinct from `double'.
++# We do the `long double' tests only if this data type is available.
+ test-longdouble-yes = test-ldouble test-ildoubl test-ldouble-finite
+ 
++ifeq ($(long-double-fcts),yes)
++# If we have distinct types then enable testing.
++test-long-double-fcts = yes
++endif
++
+ ifneq (no,$(PERL))
+ libm-vec-tests = $(addprefix test-,$(libmvec-tests))
+-libm-tests = test-float test-double $(test-longdouble-$(long-double-fcts)) \
++libm-tests = test-float test-double $(test-longdouble-$(test-long-double-fcts)) \
+ 	test-ifloat test-idouble test-float-finite test-double-finite \
+ 	$(libm-vec-tests)
+ libm-tests.o = $(addsuffix .o,$(libm-tests))
+@@ -282,11 +286,15 @@
+ ifneq ($(long-double-fcts),yes)
+ # The `double' and `long double' types are the same on this machine.
+ # We won't compile the `long double' code at all.  Tell the `double' code
+-# to define aliases for the `FUNCl' names.  To avoid type conflicts in
+-# defining those aliases, tell <math.h> to declare the `FUNCl' names with
+-# `double' instead of `long double'.
++# to define aliases for the `FUNCl' names.
++ifeq ($(header-long-double-fcts),yes)
++math-CPPFLAGS += -DNO_LONG_DOUBLE
++else
++# To avoid type conflicts in  defining those aliases, tell <math.h> to
++# declare the `FUNCl' names with `double' instead of `long double'.
+ math-CPPFLAGS += -DNO_LONG_DOUBLE -D_Mlong_double_=double
+ endif
++endif
+ 
+ # The -lieee library is actually an object file.
+ # The module just defines the _LIB_VERSION_ variable.

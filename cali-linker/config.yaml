@@ -1,0 +1,20 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+  library:
+    selectors:
+      - "libxyz.so"
+    permissions:
+      readonly:
+        - /
+      readwrite:
+        - /dev/shm
+        - /tmp
+      network: host

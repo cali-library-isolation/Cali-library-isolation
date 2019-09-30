@@ -1,0 +1,54 @@
+Index: glibc-2.21/sysdeps/hppa/dl-fptr.c
+===================================================================
+--- glibc-2.21.orig/sysdeps/hppa/dl-fptr.c
++++ glibc-2.21/sysdeps/hppa/dl-fptr.c
+@@ -28,6 +28,7 @@
+ #include <dl-fptr.h>
+ #include <dl-unmap-segments.h>
+ #include <atomic.h>
++#include <libc-internal.h>
+ 
+ #ifndef ELF_MACHINE_BOOT_FPTR_TABLE_LEN
+ /* ELF_MACHINE_BOOT_FPTR_TABLE_LEN should be greater than the number of
+@@ -181,24 +182,29 @@
+ static inline ElfW(Addr) * __attribute__ ((always_inline))
+ make_fptr_table (struct link_map *map)
+ {
+-  const ElfW(Sym) *symtab
+-    = (const void *) D_PTR (map, l_info[DT_SYMTAB]);
++  const ElfW(Sym) *symtab = (const void *) D_PTR (map, l_info[DT_SYMTAB]);
+   const char *strtab = (const void *) D_PTR (map, l_info[DT_STRTAB]);
+   ElfW(Addr) *fptr_table;
+   size_t size;
+   size_t len;
++  const ElfW(Sym) *symtabend;
+ 
+-  /* XXX Apparently the only way to find out the size of the dynamic
+-     symbol section is to assume that the string table follows right
+-     afterwards...  */
+-  len = ((strtab - (char *) symtab)
++  /* Determine the end of the dynamic symbol table using the hash.  */
++  if (map->l_info[DT_HASH] != NULL)
++    symtabend = (symtab + ((Elf_Symndx *) D_PTR (map, l_info[DT_HASH]))[1]);
++  else
++  /* There is no direct way to determine the number of symbols in the
++     dynamic symbol table and no hash table is present.  The ELF
++     binary is ill-formed but what shall we do?  Use the beginning of
++     the string table which generally follows the symbol table.  */
++    symtabend = (const ElfW(Sym) *) strtab;
++
++  len = (((char *) symtabend - (char *) symtab)
+ 	 / map->l_info[DT_SYMENT]->d_un.d_val);
+-  size = ((len * sizeof (fptr_table[0]) + GLRO(dl_pagesize) - 1)
+-	  & -GLRO(dl_pagesize));
+-  /* XXX We don't support here in the moment systems without MAP_ANON.
+-     There probably are none for IA-64.  In case this is proven wrong
+-     we will have to open /dev/null here and use the file descriptor
+-     instead of the hard-coded -1.  */
++  size = ALIGN_UP (len * sizeof (fptr_table[0]), GLRO(dl_pagesize));
++
++  /* We don't support systems without MAP_ANON.  We avoid using malloc
++     because this might get called before malloc is setup.  */
+   fptr_table = __mmap (NULL, size,
+ 		       PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,
+ 		       -1, 0);

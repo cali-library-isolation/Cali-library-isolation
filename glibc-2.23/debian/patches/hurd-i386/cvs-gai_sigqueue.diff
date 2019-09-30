@@ -1,0 +1,12 @@
+diff --git a/resolv/gai_sigqueue.c b/resolv/gai_sigqueue.c
+index 4b0c08f..40d2a68 100644
+--- a/resolv/gai_sigqueue.c
++++ b/resolv/gai_sigqueue.c
+@@ -22,6 +22,7 @@
+ #include <gai_misc.h>
+ 
+ int
++internal_function
+ __gai_sigqueue (int sig, const union sigval val, pid_t caller_pid)
+ {
+   __set_errno (ENOSYS);

@@ -1,0 +1,306 @@
+commit cbf88869edced4b23d792d95a8626e35b831df35
+Author: Siddhesh Poyarekar <siddhesh@sourceware.org>
+Date:   Mon Jul 18 22:33:09 2016 +0530
+
+    Fix cos computation for multiple precision fallback (bz #20357)
+    
+    During the sincos consolidation I made two mistakes, one was a logical
+    error due to which cos(0x1.8475e5afd4481p+0) returned
+    sin(0x1.8475e5afd4481p+0) instead.
+    
+    The second issue was an error in negating inputs for the correct
+    quadrants for sine.  I could not find a suitable test case for this
+    despite running a program to search for such an input for a couple of
+    hours.
+    
+    Following patch fixes both issues.  Tested on x86_64.  Thanks to Matt
+    Clay for identifying the issue.
+    
+            [BZ #20357]
+            * sysdeps/ieee754/dbl-64/s_sin.c (sloww): Fix up condition
+            to call __mpsin/__mpcos and to negate values.
+            * math/auto-libm-test-in: Add test.
+            * math/auto-libm-test-out: Regenerate.
+
+diff --git a/math/auto-libm-test-in b/math/auto-libm-test-in
+index ffcc40a..51c152c 100644
+--- a/math/auto-libm-test-in
++++ b/math/auto-libm-test-in
+@@ -1144,6 +1144,7 @@ cos 0x4.7857dp+68
+ cos -0x1.02e34cp+0
+ cos 0xf.f0274p+4
+ cos 0x3.042d88p+0
++cos 0x1.8475e5afd4481p+0
+ 
+ cosh 0
+ cosh -0
+@@ -3818,6 +3819,7 @@ sin min
+ sin -min
+ sin min_subnorm
+ sin -min_subnorm
++sin 0x1.8475e5afd4481p+0
+ 
+ sincos 0
+ sincos -0
+@@ -3852,6 +3854,7 @@ sincos min
+ sincos -min
+ sincos min_subnorm
+ sincos -min_subnorm
++sincos 0x1.8475e5afd4481p+0
+ 
+ sinh 0
+ sinh -0
+diff --git a/math/auto-libm-test-out b/math/auto-libm-test-out
+index c07978e..f727cf0 100644
+--- a/math/auto-libm-test-out
++++ b/math/auto-libm-test-out
+@@ -103416,6 +103416,75 @@ cos 0x3.042d88p+0
+ = cos tonearest ldbl-128ibm 0x3.042d88p+0L : -0xf.dfe6f2169e24f276e8027d91bcp-4L : inexact-ok
+ = cos towardzero ldbl-128ibm 0x3.042d88p+0L : -0xf.dfe6f2169e24f276e8027d91b8p-4L : inexact-ok
+ = cos upward ldbl-128ibm 0x3.042d88p+0L : -0xf.dfe6f2169e24f276e8027d91b8p-4L : inexact-ok
++cos 0x1.8475e5afd4481p+0
++= cos downward flt-32 0x1.8475e6p+0f : 0xd.a8263p-8f : inexact-ok
++= cos tonearest flt-32 0x1.8475e6p+0f : 0xd.a8263p-8f : inexact-ok
++= cos towardzero flt-32 0x1.8475e6p+0f : 0xd.a8263p-8f : inexact-ok
++= cos upward flt-32 0x1.8475e6p+0f : 0xd.a8264p-8f : inexact-ok
++= cos downward dbl-64 0x1.8475e6p+0 : 0xd.a8263394be6dp-8 : inexact-ok
++= cos tonearest dbl-64 0x1.8475e6p+0 : 0xd.a8263394be6dp-8 : inexact-ok
++= cos towardzero dbl-64 0x1.8475e6p+0 : 0xd.a8263394be6dp-8 : inexact-ok
++= cos upward dbl-64 0x1.8475e6p+0 : 0xd.a8263394be6d8p-8 : inexact-ok
++= cos downward ldbl-96-intel 0x1.8475e6p+0L : 0xd.a8263394be6d0e5p-8L : inexact-ok
++= cos tonearest ldbl-96-intel 0x1.8475e6p+0L : 0xd.a8263394be6d0e6p-8L : inexact-ok
++= cos towardzero ldbl-96-intel 0x1.8475e6p+0L : 0xd.a8263394be6d0e5p-8L : inexact-ok
++= cos upward ldbl-96-intel 0x1.8475e6p+0L : 0xd.a8263394be6d0e6p-8L : inexact-ok
++= cos downward ldbl-96-m68k 0x1.8475e6p+0L : 0xd.a8263394be6d0e5p-8L : inexact-ok
++= cos tonearest ldbl-96-m68k 0x1.8475e6p+0L : 0xd.a8263394be6d0e6p-8L : inexact-ok
++= cos towardzero ldbl-96-m68k 0x1.8475e6p+0L : 0xd.a8263394be6d0e5p-8L : inexact-ok
++= cos upward ldbl-96-m68k 0x1.8475e6p+0L : 0xd.a8263394be6d0e6p-8L : inexact-ok
++= cos downward ldbl-128 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= cos tonearest ldbl-128 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= cos towardzero ldbl-128 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= cos upward ldbl-128 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3ba8p-8L : inexact-ok
++= cos downward ldbl-128ibm 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a38p-8L : inexact-ok
++= cos tonearest ldbl-128ibm 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3cp-8L : inexact-ok
++= cos towardzero ldbl-128ibm 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a38p-8L : inexact-ok
++= cos upward ldbl-128ibm 0x1.8475e6p+0L : 0xd.a8263394be6d0e58c1c35a8a3cp-8L : inexact-ok
++= cos downward flt-32 0x1.8475e4p+0f : 0xd.a8283p-8f : inexact-ok
++= cos tonearest flt-32 0x1.8475e4p+0f : 0xd.a8283p-8f : inexact-ok
++= cos towardzero flt-32 0x1.8475e4p+0f : 0xd.a8283p-8f : inexact-ok
++= cos upward flt-32 0x1.8475e4p+0f : 0xd.a8284p-8f : inexact-ok
++= cos downward dbl-64 0x1.8475e4p+0 : 0xd.a82832da19f98p-8 : inexact-ok
++= cos tonearest dbl-64 0x1.8475e4p+0 : 0xd.a82832da19f98p-8 : inexact-ok
++= cos towardzero dbl-64 0x1.8475e4p+0 : 0xd.a82832da19f98p-8 : inexact-ok
++= cos upward dbl-64 0x1.8475e4p+0 : 0xd.a82832da19fap-8 : inexact-ok
++= cos downward ldbl-96-intel 0x1.8475e4p+0L : 0xd.a82832da19f9891p-8L : inexact-ok
++= cos tonearest ldbl-96-intel 0x1.8475e4p+0L : 0xd.a82832da19f9892p-8L : inexact-ok
++= cos towardzero ldbl-96-intel 0x1.8475e4p+0L : 0xd.a82832da19f9891p-8L : inexact-ok
++= cos upward ldbl-96-intel 0x1.8475e4p+0L : 0xd.a82832da19f9892p-8L : inexact-ok
++= cos downward ldbl-96-m68k 0x1.8475e4p+0L : 0xd.a82832da19f9891p-8L : inexact-ok
++= cos tonearest ldbl-96-m68k 0x1.8475e4p+0L : 0xd.a82832da19f9892p-8L : inexact-ok
++= cos towardzero ldbl-96-m68k 0x1.8475e4p+0L : 0xd.a82832da19f9891p-8L : inexact-ok
++= cos upward ldbl-96-m68k 0x1.8475e4p+0L : 0xd.a82832da19f9892p-8L : inexact-ok
++= cos downward ldbl-128 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= cos tonearest ldbl-128 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= cos towardzero ldbl-128 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= cos upward ldbl-128 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= cos downward ldbl-128ibm 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa659cp-8L : inexact-ok
++= cos tonearest ldbl-128ibm 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= cos towardzero ldbl-128ibm 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa659cp-8L : inexact-ok
++= cos upward ldbl-128ibm 0x1.8475e4p+0L : 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= cos downward dbl-64 0x1.8475e5afd4481p+0 : 0xd.a82683a33cbe8p-8 : inexact-ok
++= cos tonearest dbl-64 0x1.8475e5afd4481p+0 : 0xd.a82683a33cbe8p-8 : inexact-ok
++= cos towardzero dbl-64 0x1.8475e5afd4481p+0 : 0xd.a82683a33cbe8p-8 : inexact-ok
++= cos upward dbl-64 0x1.8475e5afd4481p+0 : 0xd.a82683a33cbfp-8 : inexact-ok
++= cos downward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebffp-8L : inexact-ok
++= cos tonearest ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbecp-8L : inexact-ok
++= cos towardzero ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebffp-8L : inexact-ok
++= cos upward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbecp-8L : inexact-ok
++= cos downward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebffp-8L : inexact-ok
++= cos tonearest ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbecp-8L : inexact-ok
++= cos towardzero ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebffp-8L : inexact-ok
++= cos upward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbecp-8L : inexact-ok
++= cos downward ldbl-128 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= cos tonearest ldbl-128 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= cos towardzero ldbl-128 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= cos upward ldbl-128 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa296688p-8L : inexact-ok
++= cos downward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= cos tonearest ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= cos towardzero ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= cos upward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xd.a82683a33cbebfffffffa2966cp-8L : inexact-ok
+ cosh 0
+ = cosh downward flt-32 0x0p+0f : 0x1p+0f : inexact-ok
+ = cosh tonearest flt-32 0x0p+0f : 0x1p+0f : inexact-ok
+@@ -264628,6 +264697,75 @@ sin -min_subnorm
+ = sin tonearest ldbl-128 -0x4p-16496L : -0x4p-16496L : inexact-ok underflow errno-erange-ok
+ = sin towardzero ldbl-128 -0x4p-16496L : -0x0p+0L : inexact-ok underflow errno-erange-ok
+ = sin upward ldbl-128 -0x4p-16496L : -0x0p+0L : inexact-ok underflow errno-erange-ok
++sin 0x1.8475e5afd4481p+0
++= sin downward flt-32 0x1.8475e6p+0f : 0xf.fa2adp-4f : inexact-ok
++= sin tonearest flt-32 0x1.8475e6p+0f : 0xf.fa2aep-4f : inexact-ok
++= sin towardzero flt-32 0x1.8475e6p+0f : 0xf.fa2adp-4f : inexact-ok
++= sin upward flt-32 0x1.8475e6p+0f : 0xf.fa2aep-4f : inexact-ok
++= sin downward dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 : inexact-ok
++= sin tonearest dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 : inexact-ok
++= sin towardzero dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 : inexact-ok
++= sin upward dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e5895p-4 : inexact-ok
++= sin downward ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin tonearest ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin towardzero ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin upward ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d2p-4L : inexact-ok
++= sin downward ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin tonearest ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin towardzero ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L : inexact-ok
++= sin upward ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d2p-4L : inexact-ok
++= sin downward ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b5618p-4L : inexact-ok
++= sin tonearest ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b562p-4L : inexact-ok
++= sin towardzero ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b5618p-4L : inexact-ok
++= sin upward ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b562p-4L : inexact-ok
++= sin downward ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b54p-4L : inexact-ok
++= sin tonearest ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b58p-4L : inexact-ok
++= sin towardzero ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b54p-4L : inexact-ok
++= sin upward ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b58p-4L : inexact-ok
++= sin downward flt-32 0x1.8475e4p+0f : 0xf.fa2adp-4f : inexact-ok
++= sin tonearest flt-32 0x1.8475e4p+0f : 0xf.fa2aep-4f : inexact-ok
++= sin towardzero flt-32 0x1.8475e4p+0f : 0xf.fa2adp-4f : inexact-ok
++= sin upward flt-32 0x1.8475e4p+0f : 0xf.fa2aep-4f : inexact-ok
++= sin downward dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 : inexact-ok
++= sin tonearest dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 : inexact-ok
++= sin towardzero dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 : inexact-ok
++= sin upward dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953ae8p-4 : inexact-ok
++= sin downward ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin tonearest ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin towardzero ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin upward ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae263p-4L : inexact-ok
++= sin downward ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin tonearest ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin towardzero ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L : inexact-ok
++= sin upward ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae263p-4L : inexact-ok
++= sin downward ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6b8p-4L : inexact-ok
++= sin tonearest ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6cp-4L : inexact-ok
++= sin towardzero ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6b8p-4L : inexact-ok
++= sin upward ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6cp-4L : inexact-ok
++= sin downward ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f4p-4L : inexact-ok
++= sin tonearest ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f8p-4L : inexact-ok
++= sin towardzero ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f4p-4L : inexact-ok
++= sin upward ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f8p-4L : inexact-ok
++= sin downward dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea838p-4 : inexact-ok
++= sin tonearest dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea84p-4 : inexact-ok
++= sin towardzero dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea838p-4 : inexact-ok
++= sin upward dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea84p-4 : inexact-ok
++= sin downward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L : inexact-ok
++= sin tonearest ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L : inexact-ok
++= sin towardzero ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L : inexact-ok
++= sin upward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L : inexact-ok
++= sin downward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L : inexact-ok
++= sin tonearest ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L : inexact-ok
++= sin towardzero ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L : inexact-ok
++= sin upward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L : inexact-ok
++= sin downward ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea68p-4L : inexact-ok
++= sin tonearest ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea7p-4L : inexact-ok
++= sin towardzero ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea68p-4L : inexact-ok
++= sin upward ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea7p-4L : inexact-ok
++= sin downward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455e8p-4L : inexact-ok
++= sin tonearest ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ecp-4L : inexact-ok
++= sin towardzero ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455e8p-4L : inexact-ok
++= sin upward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ecp-4L : inexact-ok
+ sincos 0
+ = sincos downward flt-32 0x0p+0f : 0x0p+0f 0x1p+0f : inexact-ok
+ = sincos tonearest flt-32 0x0p+0f : 0x0p+0f 0x1p+0f : inexact-ok
+@@ -266725,6 +266863,75 @@ sincos -min_subnorm
+ = sincos tonearest ldbl-128 -0x4p-16496L : -0x4p-16496L 0x1p+0L : inexact-ok underflow errno-erange-ok
+ = sincos towardzero ldbl-128 -0x4p-16496L : -0x0p+0L 0xf.fffffffffffffffffffffffffff8p-4L : inexact-ok underflow errno-erange-ok
+ = sincos upward ldbl-128 -0x4p-16496L : -0x0p+0L 0x1p+0L : inexact-ok underflow errno-erange-ok
++sincos 0x1.8475e5afd4481p+0
++= sincos downward flt-32 0x1.8475e6p+0f : 0xf.fa2adp-4f 0xd.a8263p-8f : inexact-ok
++= sincos tonearest flt-32 0x1.8475e6p+0f : 0xf.fa2aep-4f 0xd.a8263p-8f : inexact-ok
++= sincos towardzero flt-32 0x1.8475e6p+0f : 0xf.fa2adp-4f 0xd.a8263p-8f : inexact-ok
++= sincos upward flt-32 0x1.8475e6p+0f : 0xf.fa2aep-4f 0xd.a8264p-8f : inexact-ok
++= sincos downward dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 0xd.a8263394be6dp-8 : inexact-ok
++= sincos tonearest dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 0xd.a8263394be6dp-8 : inexact-ok
++= sincos towardzero dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e58948p-4 0xd.a8263394be6dp-8 : inexact-ok
++= sincos upward dbl-64 0x1.8475e6p+0 : 0xf.fa2add3e5895p-4 0xd.a8263394be6d8p-8 : inexact-ok
++= sincos downward ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e5p-8L : inexact-ok
++= sincos tonearest ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e6p-8L : inexact-ok
++= sincos towardzero ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e5p-8L : inexact-ok
++= sincos upward ldbl-96-intel 0x1.8475e6p+0L : 0xf.fa2add3e58948d2p-4L 0xd.a8263394be6d0e6p-8L : inexact-ok
++= sincos downward ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e5p-8L : inexact-ok
++= sincos tonearest ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e6p-8L : inexact-ok
++= sincos towardzero ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d1p-4L 0xd.a8263394be6d0e5p-8L : inexact-ok
++= sincos upward ldbl-96-m68k 0x1.8475e6p+0L : 0xf.fa2add3e58948d2p-4L 0xd.a8263394be6d0e6p-8L : inexact-ok
++= sincos downward ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b5618p-4L 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= sincos tonearest ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b562p-4L 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= sincos towardzero ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b5618p-4L 0xd.a8263394be6d0e58c1c35a8a3bap-8L : inexact-ok
++= sincos upward ldbl-128 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b562p-4L 0xd.a8263394be6d0e58c1c35a8a3ba8p-8L : inexact-ok
++= sincos downward ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b54p-4L 0xd.a8263394be6d0e58c1c35a8a38p-8L : inexact-ok
++= sincos tonearest ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b58p-4L 0xd.a8263394be6d0e58c1c35a8a3cp-8L : inexact-ok
++= sincos towardzero ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b54p-4L 0xd.a8263394be6d0e58c1c35a8a38p-8L : inexact-ok
++= sincos upward ldbl-128ibm 0x1.8475e6p+0L : 0xf.fa2add3e58948d10238cc27b58p-4L 0xd.a8263394be6d0e58c1c35a8a3cp-8L : inexact-ok
++= sincos downward flt-32 0x1.8475e4p+0f : 0xf.fa2adp-4f 0xd.a8283p-8f : inexact-ok
++= sincos tonearest flt-32 0x1.8475e4p+0f : 0xf.fa2aep-4f 0xd.a8283p-8f : inexact-ok
++= sincos towardzero flt-32 0x1.8475e4p+0f : 0xf.fa2adp-4f 0xd.a8283p-8f : inexact-ok
++= sincos upward flt-32 0x1.8475e4p+0f : 0xf.fa2aep-4f 0xd.a8284p-8f : inexact-ok
++= sincos downward dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 0xd.a82832da19f98p-8 : inexact-ok
++= sincos tonearest dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 0xd.a82832da19f98p-8 : inexact-ok
++= sincos towardzero dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953aep-4 0xd.a82832da19f98p-8 : inexact-ok
++= sincos upward dbl-64 0x1.8475e4p+0 : 0xf.fa2adb8953ae8p-4 0xd.a82832da19fap-8 : inexact-ok
++= sincos downward ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9891p-8L : inexact-ok
++= sincos tonearest ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9892p-8L : inexact-ok
++= sincos towardzero ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9891p-8L : inexact-ok
++= sincos upward ldbl-96-intel 0x1.8475e4p+0L : 0xf.fa2adb8953ae263p-4L 0xd.a82832da19f9892p-8L : inexact-ok
++= sincos downward ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9891p-8L : inexact-ok
++= sincos tonearest ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9892p-8L : inexact-ok
++= sincos towardzero ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae262p-4L 0xd.a82832da19f9891p-8L : inexact-ok
++= sincos upward ldbl-96-m68k 0x1.8475e4p+0L : 0xf.fa2adb8953ae263p-4L 0xd.a82832da19f9892p-8L : inexact-ok
++= sincos downward ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6b8p-4L 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= sincos tonearest ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6cp-4L 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= sincos towardzero ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6b8p-4L 0xd.a82832da19f9891d9762fa659ff8p-8L : inexact-ok
++= sincos upward ldbl-128 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f6cp-4L 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= sincos downward ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f4p-4L 0xd.a82832da19f9891d9762fa659cp-8L : inexact-ok
++= sincos tonearest ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f8p-4L 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= sincos towardzero ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f4p-4L 0xd.a82832da19f9891d9762fa659cp-8L : inexact-ok
++= sincos upward ldbl-128ibm 0x1.8475e4p+0L : 0xf.fa2adb8953ae26229c919ec8f8p-4L 0xd.a82832da19f9891d9762fa65ap-8L : inexact-ok
++= sincos downward dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea838p-4 0xd.a82683a33cbe8p-8 : inexact-ok
++= sincos tonearest dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea84p-4 0xd.a82683a33cbe8p-8 : inexact-ok
++= sincos towardzero dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea838p-4 0xd.a82683a33cbe8p-8 : inexact-ok
++= sincos upward dbl-64 0x1.8475e5afd4481p+0 : 0xf.fa2adcf9ea84p-4 0xd.a82683a33cbfp-8 : inexact-ok
++= sincos downward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L 0xd.a82683a33cbebffp-8L : inexact-ok
++= sincos tonearest ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L 0xd.a82683a33cbecp-8L : inexact-ok
++= sincos towardzero ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L 0xd.a82683a33cbebffp-8L : inexact-ok
++= sincos upward ldbl-96-intel 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L 0xd.a82683a33cbecp-8L : inexact-ok
++= sincos downward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L 0xd.a82683a33cbebffp-8L : inexact-ok
++= sincos tonearest ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L 0xd.a82683a33cbecp-8L : inexact-ok
++= sincos towardzero ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdp-4L 0xd.a82683a33cbebffp-8L : inexact-ok
++= sincos upward ldbl-96-m68k 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbep-4L 0xd.a82683a33cbecp-8L : inexact-ok
++= sincos downward ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea68p-4L 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= sincos tonearest ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea7p-4L 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= sincos towardzero ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea68p-4L 0xd.a82683a33cbebfffffffa2966878p-8L : inexact-ok
++= sincos upward ldbl-128 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ea7p-4L 0xd.a82683a33cbebfffffffa296688p-8L : inexact-ok
++= sincos downward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455e8p-4L 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= sincos tonearest ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ecp-4L 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= sincos towardzero ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455e8p-4L 0xd.a82683a33cbebfffffffa29668p-8L : inexact-ok
++= sincos upward ldbl-128ibm 0x1.8475e5afd4481p+0L : 0xf.fa2adcf9ea83dbdd053ee455ecp-4L 0xd.a82683a33cbebfffffffa2966cp-8L : inexact-ok
+ sinh 0
+ = sinh downward flt-32 0x0p+0f : 0x0p+0f : inexact-ok
+ = sinh tonearest flt-32 0x0p+0f : 0x0p+0f : inexact-ok
+diff --git a/sysdeps/ieee754/dbl-64/s_sin.c b/sysdeps/ieee754/dbl-64/s_sin.c
+index ca2532f..7c9a079 100644
+--- a/sysdeps/ieee754/dbl-64/s_sin.c
++++ b/sysdeps/ieee754/dbl-64/s_sin.c
+@@ -803,7 +803,7 @@ sloww (double x, double dx, double orig, int k)
+   a = t - y;
+   da = ((t - a) - y) + da;
+ 
+-  if (n == 2 || n == 1)
++  if (n & 2)
+     {
+       a = -a;
+       da = -da;
+@@ -817,7 +817,7 @@ sloww (double x, double dx, double orig, int k)
+   if (w[0] == w[0] + cor)
+     return (a > 0) ? w[0] : -w[0];
+ 
+-  return (n & 1) ? __mpcos (orig, 0, true) : __mpsin (orig, 0, true);
++  return k ? __mpcos (orig, 0, true) : __mpsin (orig, 0, true);
+ }
+ 
+ /***************************************************************************/

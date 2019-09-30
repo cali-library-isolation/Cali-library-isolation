@@ -1,0 +1,14 @@
+libc {
+  GLIBC_2.0 {
+    .div; .mul; .rem; .udiv; .umul; .urem;
+    __divdi3; __moddi3; __udivdi3; __umoddi3; __muldi3;
+    __ashldi3; __ashrdi3; __lshrdi3; __cmpdi2; __ucmpdi2;
+    __fixdfdi; __fixsfdi; __fixunsdfdi; __fixunssfdi;
+    __floatdidf; __floatdisf;
+  }
+}
+libm {
+  GLIBC_2.23 {
+    __sqrtl_finite;
+  }
+}

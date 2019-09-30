@@ -1,0 +1,14 @@
+https://sourceware.org/ml/libc-alpha/2016-04/msg00025.html
+
+Index: glibc-2.22/misc/getauxval.c
+===================================================================
+--- glibc-2.22.orig/misc/getauxval.c
++++ glibc-2.22/misc/getauxval.c
+@@ -35,6 +35,7 @@ __getauxval (unsigned long int type)
+   else if (type == AT_HWCAP2)
+     return GLRO(dl_hwcap2);
+ 
++ if (GLRO(dl_auxv))
+   for (p = GLRO(dl_auxv); p->a_type != AT_NULL; p++)
+     if (p->a_type == type)
+       return p->a_un.a_val;

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ]
+then
+    # /etc/ld.so.nohwcap code:
+    __NOHWCAP__
+fi
+
+#DEBHELPER#
+
+exit 0

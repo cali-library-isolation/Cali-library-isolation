@@ -1,0 +1,18 @@
+--- a/elf/tst-auxv.c
++++ b/elf/tst-auxv.c
+@@ -42,6 +42,7 @@ do_test (int argc, char *argv[])
+       return 1;
+     }
+ 
++#ifdef AT_EXECFN
+   errno = 0;
+   execfn = (const char *) getauxval (AT_EXECFN);
+ 
+@@ -62,6 +63,7 @@ do_test (int argc, char *argv[])
+       printf ("Mismatch: argv[0]: %s vs. AT_EXECFN: %s\n", argv[0], execfn);
+       return 1;
+     }
++#endif
+ 
+   return 0;
+ }

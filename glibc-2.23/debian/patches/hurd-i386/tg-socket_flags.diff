@@ -1,0 +1,63 @@
+From: Thomas Schwinge <thomas@schwinge.name>
+Subject: [PATCH] socket_flags
+
+2008-12-17  Thomas Schwinge  <tschwinge@gnu.org>
+
+	SOCK_CLOEXEC and SOCK_NONBLOCK for socket on GNU Hurd.
+	* sysdeps/mach/hurd/socket.c (__socket): Handle SOCK_CLOEXEC and
+	SOCK_NONBLOCK.
+	* sysdeps/mach/hurd/kernel-features.h (__ASSUME_SOCK_CLOEXEC): Define.
+
+---
+ sysdeps/mach/hurd/kernel-features.h |  1 +
+ sysdeps/mach/hurd/socket.c          | 15 ++++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+--- a/sysdeps/mach/hurd/kernel-features.h
++++ b/sysdeps/mach/hurd/kernel-features.h
+@@ -23,3 +23,4 @@
+ #define __ASSUME_O_CLOEXEC	1
+ #define __ASSUME_DUP3		1
+ #define __ASSUME_ACCEPT4	1
++#define __ASSUME_SOCK_CLOEXEC	1
+--- a/sysdeps/mach/hurd/socket.c
++++ b/sysdeps/mach/hurd/socket.c
+@@ -21,6 +21,7 @@
+ #include <hurd/socket.h>
+ #include <hurd/fd.h>
+ #include <fcntl.h>
++#include <fcntl-internal.h>
+ 
+ /* Create a new socket of type TYPE in domain DOMAIN, using
+    protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.
+@@ -33,6 +34,11 @@ __socket (domain, type, protocol)
+ {
+   error_t err;
+   socket_t sock, server;
++  int flags = sock_to_o_flags (type & ~SOCK_TYPE_MASK);
++  type &= SOCK_TYPE_MASK;
++
++  if (flags & ~(O_CLOEXEC | O_NONBLOCK))
++    return __hurd_fail (EINVAL);
+ 
+   /* Find the socket server for DOMAIN.  */
+   server = _hurd_socket_server (domain, 0);
+@@ -58,10 +64,17 @@ __socket (domain, type, protocol)
+       || err == MIG_BAD_ID || err == EOPNOTSUPP)
+     err = EAFNOSUPPORT;
+ 
++  if (! err)
++    {
++      if (flags & O_NONBLOCK)
++	err = __io_set_some_openmodes (sock, O_NONBLOCK);
++      /* TODO: do we need special ERR massaging after the previous call?  */
++    }
++
+   if (err)
+     return __hurd_fail (err);
+ 
+-  return _hurd_intern_fd (sock, O_IGNORE_CTTY, 1);
++  return _hurd_intern_fd (sock, O_IGNORE_CTTY | flags, 1);
+ }
+ 
+ libc_hidden_def (__socket)

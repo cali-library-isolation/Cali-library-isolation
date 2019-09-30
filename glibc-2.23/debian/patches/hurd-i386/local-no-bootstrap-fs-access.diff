@@ -1,0 +1,21 @@
+Calling access at process boot is deemed to fail for the root filesystem
+process. hurd-i386 doesn't use hwcap yet, so it is harmless to disable testing
+for /etc/ld.so.nohwcap.
+
+TODO: find a process-startup-working way to detect root filesystem case.
+
+---
+ dl-hwcaps.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/elf/dl-hwcaps.c.original	2013-07-01 00:02:55.000000000 +0200
++++ b/elf/dl-hwcaps.c	2013-07-01 00:02:56.000000000 +0200
+@@ -102,7 +102,7 @@
+   /* For TLS enabled builds always add 'tls'.  */
+   ++cnt;
+ 
+-  if (__access ("/etc/ld.so.nohwcap", F_OK) == 0)
++  if (0 && __access ("/etc/ld.so.nohwcap", F_OK) == 0)
+     {
+       /* If hwcap is disabled, we only have the base directory to search.  */
+       result = (struct r_strlenpair *) malloc (sizeof (*result));

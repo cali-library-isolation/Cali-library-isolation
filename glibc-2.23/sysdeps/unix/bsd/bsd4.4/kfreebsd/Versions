@@ -1,0 +1,129 @@
+libc {
+  # The comment lines with "#errlist-compat" are magic; see errlist-compat.awk.
+  # When you get an error from errlist-compat.awk, you need to add a new
+  # version here.  Don't do this blindly, since this means changing the ABI
+  # for all GNU/kFreeBSD configurations.
+
+  GLIBC_2.2.6 {
+    # c*
+    clone;
+
+    # e*
+    extattrctl; extattr_delete_file; extattr_get_file; extattr_set_file;
+
+    # f*
+    fhopen; fhstat; fhstatfs; futimes;
+
+    # g*
+    getdents; getfh; getfsstat; getfsstat64; getmntinfo; getmntinfo64;
+    getresgid; getresuid;
+
+    # i*
+    issetugid;
+
+    # j*
+    jail;
+
+    # k*
+    kldfind; kldfirstmod; kldload; kldnext; kldstat; kldsym; kldunload; kldunloadf;
+    ktrace;
+
+    # l*
+    lchmod; lutimes;
+
+    # m*
+    minherit; modfind; modfnext; modnext; modstat; mount;
+
+    # n*
+    nmount; ntp_adjtime; ntp_gettime;
+
+    # q*
+    quotactl;
+
+    # r*
+    rfork; rtprio;
+
+    # s*
+    sendfile; setresgid; setresuid; swapoff; swapon; sysarch; sysctl; sysctlbyname;
+
+    # u*
+    undelete; unmount; utrace;
+
+    # see <sys/acl.h>.
+    __acl_aclcheck_fd; __acl_aclcheck_file; __acl_delete_fd; __acl_delete_file;
+    __acl_get_fd; __acl_get_file; __acl_set_fd; __acl_set_file;
+
+    # see <errno.h>.
+    __errno_location;
+
+    # see <sys/sysctl.h>.
+    __sysctl;
+
+    # Questionable system calls. These functions may be removed at any moment.
+    __syscall_aio_cancel; __syscall_aio_error; __syscall_aio_read;
+    __syscall_aio_return; __syscall_aio_suspend; __syscall_aio_waitcomplete;
+    __syscall_aio_write; __syscall_lio_listio;
+    __syscall_obreak;
+    __syscall_yield;
+  }
+  GLIBC_2.3 {
+    #errlist-compat     87
+    _sys_errlist; sys_errlist; _sys_nerr; sys_nerr;
+  }
+  GLIBC_2.3.4 {
+    # f*
+    fhstat64; fhstatfs64;
+    kqueue; kevent;
+
+    #errlist-compat     93
+    _sys_errlist; sys_errlist; _sys_nerr; sys_nerr;
+
+    # functions used in inline functions or macros
+    __libc_sa_len;
+  }
+  GLIBC_2.10 {
+    devname;
+    devname_r;
+    kenv;
+    sysctlnametomib;
+  }
+  GLIBC_2.11 {
+    lchflags;
+    #errlist-compat 94
+    _sys_errlist; sys_errlist; _sys_nerr; sys_nerr;
+  }
+  GLIBC_2.13 {
+    jail_attach;
+    jail_remove;
+    jail_get;
+    jail_set;
+  }
+  GLIBC_2.18 {
+    msgctl;
+    semctl;
+    shmctl;
+    waitid;
+    #errlist-compat 97
+    _sys_errlist; sys_errlist; _sys_nerr; sys_nerr;
+  }
+  GLIBC_2.21 {
+    __statfs;
+  }
+  GLIBC_PRIVATE {
+    # needed by libpthread.
+    __clone; __libc_fork; __libc_sigaction; __kernel_getosreldate;
+    # needed by libpthread as INLINE_SYSCALL:
+    __syscall_fork;
+    __syscall_open; __syscall_close;
+    __syscall_read; __syscall_write;
+    __syscall_wait4; __syscall_fcntl;
+    # needed by librt as INLINE_SYSCALL:
+    __syscall_clock_getres; __syscall_clock_gettime; __syscall_clock_settime;
+    __syscall_ktimer_create; __syscall_ktimer_gettime; __syscall_ktimer_settime; __syscall_ktimer_getoverrun; __syscall_ktimer_delete;
+    # misc fixes for FreeBSD:
+    __syscall_connect; __syscall_sendto;
+    __syscall_cpuset_getaffinity ; __syscall_cpuset_setaffinity;
+     # global variable used in brk()
+    _end;
+  }
+}

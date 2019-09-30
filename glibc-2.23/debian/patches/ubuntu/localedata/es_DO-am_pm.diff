@@ -1,0 +1,20 @@
+Description: Define 12-hours a.m./p.m. format
+Bug-Ubuntu: https://launchpad.net/bugs/1288843
+Forwarded: http://sourceware.org/bugzilla/show_bug.cgi?id=16045
+Author: Gunnar Hjalmarsson <gunnarhj@ubuntu.com>
+
+--- a/localedata/locales/es_DO	2012-03-06 10:10:20.000000000 +0100
++++ b/localedata/locales/es_DO	2014-03-09 01:03:37.309958275 +0100
+@@ -114,8 +114,10 @@
+ d_t_fmt "<U0025><U0061><U0020><U0025><U0064><U0020><U0025><U0062><U0020><U0025><U0059><U0020><U0025><U0054><U0020><U0025><U005A>"
+ d_fmt   "<U0025><U0064><U002F><U0025><U006D><U002F><U0025><U0079>"
+ t_fmt   "<U0025><U0054>"
+-am_pm   "";""
+-t_fmt_ampm ""
++% a.m., p.m.
++am_pm         "<U0061><U002E><U006D><U002E>";"<U0070><U002E><U006D><U002E>"
++% %I:%M:%S %p
++t_fmt_ampm    "<U0025><U0049><U003A><U0025><U004D><U003A><U0025><U0053><U0020><U0025><U0070>"
+ date_fmt	"<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+ <U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+ <U0025><U005A><U0020><U0025><U0059>"

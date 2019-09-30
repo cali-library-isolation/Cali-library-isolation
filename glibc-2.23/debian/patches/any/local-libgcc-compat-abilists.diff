@@ -1,0 +1,190 @@
+Description: Fix abilists to match ABI additions from local-libgcc-compat*
+Author: Adam Conrad <adconrad@0c3.net>
+Last-Update: 2015-03-19
+
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/alpha/libc.abilist
++++ glibc-2.21/sysdeps/unix/sysv/linux/alpha/libc.abilist
+@@ -179,6 +179,7 @@
+ GLIBC_2.0 __mempcpy F
+ GLIBC_2.0 __monstartup F
+ GLIBC_2.0 __morecore D 0x8
++GLIBC_2.0 __multi3 F
+ GLIBC_2.0 __nss_configure_lookup F
+ GLIBC_2.0 __nss_database_lookup F
+ GLIBC_2.0 __nss_group_lookup F
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/i386/libc.abilist
++++ glibc-2.21/sysdeps/unix/sysv/linux/i386/libc.abilist
+@@ -111,6 +111,7 @@
+ GLIBC_2.0 __check_rhosts_file D 0x4
+ GLIBC_2.0 __clone F
+ GLIBC_2.0 __close F
++GLIBC_2.0 __cmpdi2 F
+ GLIBC_2.0 __cmsg_nxthdr F
+ GLIBC_2.0 __connect F
+ GLIBC_2.0 __ctype32_b D 0x4
+@@ -134,6 +135,9 @@
+ GLIBC_2.0 __finite F
+ GLIBC_2.0 __finitef F
+ GLIBC_2.0 __finitel F
++GLIBC_2.0 __fixunsdfdi F
++GLIBC_2.0 __fixunsxfdi F
++GLIBC_2.0 __floatdidf F
+ GLIBC_2.0 __fork F
+ GLIBC_2.0 __fpu_control D 0x2
+ GLIBC_2.0 __frame_state_for F
+@@ -232,6 +236,7 @@
+ GLIBC_2.0 __sysv_signal F
+ GLIBC_2.0 __timezone D 0x4
+ GLIBC_2.0 __tzname D 0x8
++GLIBC_2.0 __ucmpdi2 F
+ GLIBC_2.0 __udivdi3 F
+ GLIBC_2.0 __uflow F
+ GLIBC_2.0 __umoddi3 F
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/mips/mips32/fpu/libc.abilist
++++ glibc-2.21/sysdeps/unix/sysv/linux/mips/mips32/fpu/libc.abilist
+@@ -111,6 +111,7 @@
+ GLIBC_2.0 __check_rhosts_file D 0x4
+ GLIBC_2.0 __clone F
+ GLIBC_2.0 __close F
++GLIBC_2.0 __cmpdi2 F
+ GLIBC_2.0 __cmsg_nxthdr F
+ GLIBC_2.0 __connect F
+ GLIBC_2.0 __ctype32_b D 0x4
+@@ -125,6 +126,7 @@
+ GLIBC_2.0 __deregister_frame F
+ GLIBC_2.0 __deregister_frame_info F
+ GLIBC_2.0 __dgettext F
++GLIBC_2.0 __divdi3 F
+ GLIBC_2.0 __dup2 F
+ GLIBC_2.0 __environ D 0x4
+ GLIBC_2.0 __errno_location F
+@@ -133,6 +135,9 @@
+ GLIBC_2.0 __finite F
+ GLIBC_2.0 __finitef F
+ GLIBC_2.0 __finitel F
++GLIBC_2.0 __fixdfdi F
++GLIBC_2.0 __floatdidf F
++GLIBC_2.0 __floatdisf F
+ GLIBC_2.0 __fork F
+ GLIBC_2.0 __fpu_control D 0x4
+ GLIBC_2.0 __frame_state_for F
+@@ -172,6 +177,7 @@
+ GLIBC_2.0 __mbrtowc F
+ GLIBC_2.0 __memalign_hook D 0x4
+ GLIBC_2.0 __mempcpy F
++GLIBC_2.0 __moddi3 F
+ GLIBC_2.0 __monstartup F
+ GLIBC_2.0 __morecore D 0x4
+ GLIBC_2.0 __nss_configure_lookup F
+@@ -230,7 +236,10 @@
+ GLIBC_2.0 __sysv_signal F
+ GLIBC_2.0 __timezone D 0x4
+ GLIBC_2.0 __tzname D 0x8
++GLIBC_2.0 __ucmpdi2 F
++GLIBC_2.0 __udivdi3 F
+ GLIBC_2.0 __uflow F
++GLIBC_2.0 __umoddi3 F
+ GLIBC_2.0 __underflow F
+ GLIBC_2.0 __vfscanf F
+ GLIBC_2.0 __vsnprintf F
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/s390/s390-32/libc.abilist
++++ glibc-2.21/sysdeps/unix/sysv/linux/s390/s390-32/libc.abilist
+@@ -111,6 +111,7 @@
+ GLIBC_2.0 __check_rhosts_file D 0x4
+ GLIBC_2.0 __clone F
+ GLIBC_2.0 __close F
++GLIBC_2.0 __cmpdi2 F
+ GLIBC_2.0 __cmsg_nxthdr F
+ GLIBC_2.0 __connect F
+ GLIBC_2.0 __ctype32_b D 0x4
+@@ -134,6 +135,12 @@
+ GLIBC_2.0 __finite F
+ GLIBC_2.0 __finitef F
+ GLIBC_2.0 __finitel F
++GLIBC_2.0 __fixdfdi F
++GLIBC_2.0 __fixsfdi F
++GLIBC_2.0 __fixunsdfdi F
++GLIBC_2.0 __fixunssfdi F
++GLIBC_2.0 __floatdidf F
++GLIBC_2.0 __floatdisf F
+ GLIBC_2.0 __fork F
+ GLIBC_2.0 __fpu_control D 0x4
+ GLIBC_2.0 __frame_state_for F
+@@ -232,6 +239,7 @@
+ GLIBC_2.0 __sysv_signal F
+ GLIBC_2.0 __timezone D 0x4
+ GLIBC_2.0 __tzname D 0x8
++GLIBC_2.0 __ucmpdi2 F
+ GLIBC_2.0 __udivdi3 F
+ GLIBC_2.0 __uflow F
+ GLIBC_2.0 __umoddi3 F
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/sparc/sparc32/libc.abilist
++++ glibc-2.21/sysdeps/unix/sysv/linux/sparc/sparc32/libc.abilist
+@@ -110,6 +110,8 @@
+ GLIBC_2.0 __argz_count F
+ GLIBC_2.0 __argz_next F
+ GLIBC_2.0 __argz_stringify F
++GLIBC_2.0 __ashldi3 F
++GLIBC_2.0 __ashrdi3 F
+ GLIBC_2.0 __assert_fail F
+ GLIBC_2.0 __assert_perror_fail F
+ GLIBC_2.0 __bsd_getpgrp F
+@@ -117,6 +119,7 @@
+ GLIBC_2.0 __check_rhosts_file D 0x4
+ GLIBC_2.0 __clone F
+ GLIBC_2.0 __close F
++GLIBC_2.0 __cmpdi2 F
+ GLIBC_2.0 __cmsg_nxthdr F
+ GLIBC_2.0 __connect F
+ GLIBC_2.0 __ctype32_b D 0x4
+@@ -131,6 +134,7 @@
+ GLIBC_2.0 __deregister_frame F
+ GLIBC_2.0 __deregister_frame_info F
+ GLIBC_2.0 __dgettext F
++GLIBC_2.0 __divdi3 F
+ GLIBC_2.0 __dup2 F
+ GLIBC_2.0 __environ D 0x4
+ GLIBC_2.0 __errno_location F
+@@ -139,6 +143,12 @@
+ GLIBC_2.0 __finite F
+ GLIBC_2.0 __finitef F
+ GLIBC_2.0 __finitel F
++GLIBC_2.0 __fixdfdi F
++GLIBC_2.0 __fixsfdi F
++GLIBC_2.0 __fixunsdfdi F
++GLIBC_2.0 __fixunssfdi F
++GLIBC_2.0 __floatdidf F
++GLIBC_2.0 __floatdisf F
+ GLIBC_2.0 __fork F
+ GLIBC_2.0 __fpu_control D 0x4
+ GLIBC_2.0 __frame_state_for F
+@@ -171,6 +181,7 @@
+ GLIBC_2.0 __libc_start_main F
+ GLIBC_2.0 __libc_valloc F
+ GLIBC_2.0 __lseek F
++GLIBC_2.0 __lshrdi3 F
+ GLIBC_2.0 __lxstat F
+ GLIBC_2.0 __malloc_hook D 0x4
+ GLIBC_2.0 __malloc_initialize_hook D 0x4
+@@ -178,8 +189,10 @@
+ GLIBC_2.0 __mbrtowc F
+ GLIBC_2.0 __memalign_hook D 0x4
+ GLIBC_2.0 __mempcpy F
++GLIBC_2.0 __moddi3 F
+ GLIBC_2.0 __monstartup F
+ GLIBC_2.0 __morecore D 0x4
++GLIBC_2.0 __muldi3 F
+ GLIBC_2.0 __nss_configure_lookup F
+ GLIBC_2.0 __nss_database_lookup F
+ GLIBC_2.0 __nss_group_lookup F
+@@ -236,7 +249,10 @@
+ GLIBC_2.0 __sysv_signal F
+ GLIBC_2.0 __timezone D 0x4
+ GLIBC_2.0 __tzname D 0x8
++GLIBC_2.0 __ucmpdi2 F
++GLIBC_2.0 __udivdi3 F
+ GLIBC_2.0 __uflow F
++GLIBC_2.0 __umoddi3 F
+ GLIBC_2.0 __underflow F
+ GLIBC_2.0 __vfscanf F
+ GLIBC_2.0 __vsnprintf F

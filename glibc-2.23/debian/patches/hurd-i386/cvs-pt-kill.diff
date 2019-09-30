@@ -1,0 +1,23 @@
+commit 08d8159d5a960466bb9a951ecc8036baa4d74e6b
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Sat Oct 10 16:42:29 2015 +0200
+
+    Fix pthread_kill
+    
+    * sysdeps/hurd/pt-kill.c (pthread_kill): Lock ss lock before calling
+    _hurd_raise_signal. Return error returned by _hurd_raise_signal.
+
+diff --git a/libpthread/sysdeps/hurd/pt-kill.c b/libpthread/sysdeps/hurd/pt-kill.c
+index d204e3f..49dfd7d 100644
+--- a/libpthread/sysdeps/hurd/pt-kill.c
++++ b/libpthread/sysdeps/hurd/pt-kill.c
+@@ -46,7 +46,6 @@ pthread_kill (pthread_t thread, int sig)
+   detail.code = sig;
+   detail.error = 0;
+ 
+-  _hurd_raise_signal (ss, sig, &detail);
+-
+-  return 0;
++  __spin_lock (&ss->lock);
++  return _hurd_raise_signal (ss, sig, &detail);
+ }

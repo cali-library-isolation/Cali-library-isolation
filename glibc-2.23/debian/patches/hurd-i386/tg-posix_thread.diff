@@ -1,0 +1,129 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: [PATCH] t/posix_thread
+
+Declare that we have a libpthread.
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+---
+ sysdeps/mach/hurd/Makefile         |  4 ++++
+ sysdeps/mach/hurd/bits/local_lim.h |  9 ++++++++
+ sysdeps/mach/hurd/bits/posix_opt.h | 42 +++++++++++++++++++++++++-------------
+
+diff --git a/sysdeps/mach/hurd/Makefile b/sysdeps/mach/hurd/Makefile
+index 68aedb6..4a6ee36 100644
+--- a/sysdeps/mach/hurd/Makefile
++++ b/sysdeps/mach/hurd/Makefile
+@@ -167,6 +167,10 @@ $(objpfx)librtld.map: $(rpcuserlibs:.so=_pic.a)
+ CFLAGS-dl-load.c = -DEXTERNAL_MAP_FROM_FD
+ endif
+ 
++ifeq ($(subdir),posix)
++CFLAGS-confstr.c += -DLIBPTHREAD_VERSION='"libpthread 0.3"'
++endif
++
+ # Override the generic Makeconfig values so we link against the RPC libs.
+ link-libc-static := -Wl,--start-group \
+ 		    $(patsubst %,$(common-objpfx)%.a,\
+diff --git a/sysdeps/mach/hurd/bits/local_lim.h b/sysdeps/mach/hurd/bits/local_lim.h
+index f7cc86c..570b5ce 100644
+--- a/sysdeps/mach/hurd/bits/local_lim.h
++++ b/sysdeps/mach/hurd/bits/local_lim.h
+@@ -32,3 +32,12 @@
+    suitable, and `sysconf' will return a number at least as large.  */
+ 
+ #define NGROUPS_MAX	256
++
++/* The number of data keys per process.  */
++#define _POSIX_THREAD_KEYS_MAX	128
++
++/* Controlling the iterations of destructors for thread-specific data.  */
++#define _POSIX_THREAD_DESTRUCTOR_ITERATIONS	4
++
++/* The number of threads per process.  */
++#define _POSIX_THREAD_THREADS_MAX	64
+diff --git a/sysdeps/mach/hurd/bits/posix_opt.h b/sysdeps/mach/hurd/bits/posix_opt.h
+index 940e376..24ef55c 100644
+--- a/sysdeps/mach/hurd/bits/posix_opt.h
++++ b/sysdeps/mach/hurd/bits/posix_opt.h
+@@ -71,24 +71,38 @@
+ /* XPG4.2 shared memory is supported.  */
+ #define _XOPEN_SHM      1
+ 
+-/* We do not have the POSIX threads interface.  */
+-#define _POSIX_THREADS	-1
++/* Tell we have POSIX threads.  */
++#define _POSIX_THREADS	200112L
+ 
+ /* We have the reentrant functions described in POSIX.  */
+ #define _POSIX_REENTRANT_FUNCTIONS      1
+ #define _POSIX_THREAD_SAFE_FUNCTIONS	200809L
+ 
+-/* These are all things that won't be supported when _POSIX_THREADS is not.  */
++/* We do not provide priority scheduling for threads.  */
+ #define _POSIX_THREAD_PRIORITY_SCHEDULING	-1
+-#define _POSIX_THREAD_ATTR_STACKSIZE		-1
+-#define _POSIX_THREAD_ATTR_STACKADDR		-1
++
++/* We support user-defined stack sizes.  */
++#define _POSIX_THREAD_ATTR_STACKSIZE	200112L
++
++/* We support user-defined stacks.  */
++#define _POSIX_THREAD_ATTR_STACKADDR	200112L
++
++/* We do not support priority inheritence.  */
+ #define _POSIX_THREAD_PRIO_INHERIT		-1
++
++/* We do not support priority protection.  */
+ #define _POSIX_THREAD_PRIO_PROTECT		-1
++
+ #ifdef __USE_XOPEN2K8
++/* We do not support priority inheritence for robust mutexes.  */
+ # define _POSIX_THREAD_ROBUST_PRIO_INHERIT	-1
++
++/* We do not support priority protection for robust mutexes.  */
+ # define _POSIX_THREAD_ROBUST_PRIO_PROTECT	-1
+ #endif
+-#define _POSIX_SEMAPHORES			-1
++
++/* We support POSIX.1b semaphores.  */
++#define _POSIX_SEMAPHORES			200112L
+ 
+ /* Real-time signals are not yet supported.  */
+ #define _POSIX_REALTIME_SIGNALS	-1
+@@ -121,17 +135,17 @@
+ /* GNU libc provides regular expression handling.  */
+ #define _POSIX_REGEXP	1
+ 
+-/* Reader/Writer locks are not available.  */
+-#define _POSIX_READER_WRITER_LOCKS	-1
++/* Reader/Writer locks are available.  */
++#define _POSIX_READER_WRITER_LOCKS	200112L
+ 
+ /* We have a POSIX shell.  */
+ #define _POSIX_SHELL	1
+ 
+-/* We cannot support the Timeouts option without _POSIX_THREADS.  */
+-#define _POSIX_TIMEOUTS	-1
++/* We support the Timeouts option.  */
++#define _POSIX_TIMEOUTS	200112L
+ 
+-/* We do not support spinlocks.  */
+-#define _POSIX_SPIN_LOCKS	-1
++/* We support spinlocks.  */
++#define _POSIX_SPIN_LOCKS	200112L
+ 
+ /* The `spawn' function family is supported.  */
+ #define _POSIX_SPAWN	200809L
+@@ -140,7 +154,7 @@
+ #define _POSIX_TIMERS	0
+ 
+-/* The barrier functions are not available.  */
+-#define _POSIX_BARRIERS	-1
++/* We support barrier functions.  */
++#define _POSIX_BARRIERS	200112L
+ 
+ /* POSIX message queues could be available in future.  */
+ #define	_POSIX_MESSAGE_PASSING	0
+-- 
+tg: (9a079e2..) t/posix_thread (depends on: baseline)

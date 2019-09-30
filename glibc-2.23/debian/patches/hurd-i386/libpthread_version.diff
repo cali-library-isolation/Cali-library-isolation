@@ -1,0 +1,217 @@
+This dates when libpthread was moved to glibc and some features were added.
+
+2.13-31/38/39 dates when the global signal disposition call was added.
+TODO: _DEBIAN_ in versions however pose problem. Remove the _DEBIAN_ version
+once packages are rebuilt against 2.21.
+
+Index: glibc-2.21/libpthread/Versions
+===================================================================
+--- glibc-2.21.orig/libpthread/Versions
++++ glibc-2.21/libpthread/Versions
+@@ -1,5 +1,5 @@
+ libc {
+-  GLIBC_2.13 {
++  GLIBC_2.13_DEBIAN_31 {
+     pthread_attr_destroy; pthread_attr_getdetachstate;
+     pthread_attr_getinheritsched; pthread_attr_getschedparam;
+     pthread_attr_getschedpolicy; pthread_attr_getscope; pthread_attr_init;
+@@ -16,6 +16,25 @@ libc {
+     pthread_mutex_lock; pthread_mutex_trylock; pthread_mutex_unlock;
+     pthread_self; pthread_setcancelstate; pthread_setcanceltype;
+     __pthread_get_cleanup_stack;
++  }
++  GLIBC_2.21 {
++    pthread_attr_destroy; pthread_attr_getdetachstate;
++    pthread_attr_getinheritsched; pthread_attr_getschedparam;
++    pthread_attr_getschedpolicy; pthread_attr_getscope; pthread_attr_init;
++    pthread_attr_setdetachstate; pthread_attr_setinheritsched;
++    pthread_attr_setschedparam; pthread_attr_setschedpolicy;
++    pthread_attr_setscope;
++    pthread_condattr_destroy; pthread_condattr_init;
++    pthread_cond_broadcast; pthread_cond_destroy;
++    pthread_cond_init; pthread_cond_signal; pthread_cond_wait;
++    pthread_cond_timedwait;
++    pthread_equal;
++    pthread_exit; pthread_getschedparam; pthread_setschedparam;
++    pthread_mutex_destroy; pthread_mutex_init;
++    pthread_mutex_lock; pthread_mutex_trylock; pthread_mutex_unlock;
++    pthread_self; pthread_setcancelstate; pthread_setcanceltype;
++    __pthread_get_cleanup_stack;
++  }
+   GLIBC_PRIVATE {
+     __libc_pthread_init;
+     __register_atfork;
+@@ -132,7 +151,13 @@ libpthread {
+     __pthread_spin_lock; __pthread_spin_trylock; __pthread_spin_unlock;
+     _pthread_spin_lock;
+   }
+-  GLIBC_2.17 {
++  GLIBC_2.13_DEBIAN_38 {
++    pthread_hurd_cond_wait_np;
++  }
++  GLIBC_2.13_DEBIAN_39 {
++    pthread_hurd_cond_timedwait_np;
++  }
++  GLIBC_2.21 {
+     pthread_hurd_cond_wait_np;
+     pthread_hurd_cond_timedwait_np;
+   }
+Index: glibc-2.21/libpthread/sysdeps/mach/hurd/pt-hurd-cond-timedwait.c
+===================================================================
+--- glibc-2.21.orig/libpthread/sysdeps/mach/hurd/pt-hurd-cond-timedwait.c
++++ glibc-2.21/libpthread/sysdeps/mach/hurd/pt-hurd-cond-timedwait.c
+@@ -23,6 +23,8 @@
+ 
+ #include <pt-internal.h>
+ 
++#include <shlib-compat.h>
++
+ extern int __pthread_hurd_cond_timedwait_internal (pthread_cond_t *cond,
+ 						   pthread_mutex_t *mutex,
+ 						   const struct timespec *abstime);
+@@ -34,8 +36,18 @@ __pthread_hurd_cond_timedwait_np (pthrea
+ {
+   return __pthread_hurd_cond_timedwait_internal (cond, mutex, abstime);
+ }
++versioned_symbol (libpthread, __pthread_hurd_cond_timedwait_np, pthread_hurd_cond_timedwait_np, GLIBC_2_21);
+ 
+-strong_alias (__pthread_hurd_cond_timedwait_np, pthread_hurd_cond_timedwait_np);
++#if SHLIB_COMPAT (libpthread, GLIBC_2_13, GLIBC_2_21)
++int
++__pthread_hurd_cond_timedwait_np_2_13 (pthread_cond_t *cond,
++				  pthread_mutex_t *mutex,
++				  const struct timespec *abstime)
++{
++  return __pthread_hurd_cond_timedwait_internal (cond, mutex, abstime);
++}
++compat_symbol (libpthread, __pthread_hurd_cond_timedwait_np_2_13, pthread_hurd_cond_timedwait_np, GLIBC_2_13_DEBIAN_39);
++#endif
+ 
+ int
+ __pthread_hurd_cond_timedwait_internal (pthread_cond_t *cond,
+Index: glibc-2.21/libpthread/sysdeps/mach/hurd/pt-hurd-cond-wait.c
+===================================================================
+--- glibc-2.21.orig/libpthread/sysdeps/mach/hurd/pt-hurd-cond-wait.c
++++ glibc-2.21/libpthread/sysdeps/mach/hurd/pt-hurd-cond-wait.c
+@@ -23,6 +23,8 @@
+ 
+ #include <pt-internal.h>
+ 
++#include <shlib-compat.h>
++
+ /* Implemented in pt-hurd-cond-timedwait.c.  */
+ extern int __pthread_hurd_cond_timedwait_internal (pthread_cond_t *cond,
+ 						   pthread_mutex_t *mutex,
+@@ -37,5 +39,17 @@ __pthread_hurd_cond_wait_np (pthread_con
+   err = __pthread_hurd_cond_timedwait_internal (cond, mutex, NULL);
+   return (err == EINTR);
+ }
++versioned_symbol (libpthread, __pthread_hurd_cond_wait_np, pthread_hurd_cond_wait_np, GLIBC_2_21);
+ 
+-strong_alias (__pthread_hurd_cond_wait_np, pthread_hurd_cond_wait_np);
++#if SHLIB_COMPAT (libpthread, GLIBC_2_13, GLIBC_2_21)
++int
++__pthread_hurd_cond_wait_np_2_13 (pthread_cond_t *cond,
++			     pthread_mutex_t *mutex)
++{
++  error_t err;
++
++  err = __pthread_hurd_cond_timedwait_internal (cond, mutex, NULL);
++  return (err == EINTR);
++}
++compat_symbol (libpthread, __pthread_hurd_cond_wait_np_2_13, pthread_hurd_cond_wait_np, GLIBC_2_13_DEBIAN_38);
++#endif
+Index: glibc-2.21/libpthread/forward.c
+===================================================================
+--- glibc-2.21.orig/libpthread/forward.c
++++ glibc-2.21/libpthread/forward.c
+@@ -23,20 +23,37 @@
+ #include <shlib-compat.h>
+ #include <pthread-functions.h>
+ 
++#include <shlib-compat.h>
++
+ /* Pointers to the libc functions.  */
+ struct pthread_functions __libc_pthread_functions attribute_hidden;
+ int __libc_pthread_functions_init attribute_hidden;
+ 
+-
+ # define FORWARD2(name, rettype, decl, params, defaction) \
+ rettype									      \
+-name decl								      \
++__##name decl								      \
+ {									      \
+   if (!__libc_pthread_functions_init)			      \
+     defaction;								      \
+ 									      \
+   return PTHFCT_CALL (ptr_##name, params);			      \
+-}
++} \
++versioned_symbol (libc, __##name, name, GLIBC_2_21); \
++
++#if SHLIB_COMPAT (libc, GLIBC_2_13, GLIBC_2_21)
++# define FORWARD2_COMPAT(name, rettype, decl, params, defaction) \
++rettype									      \
++__##name##_2_13 decl							      \
++{									      \
++  if (!__libc_pthread_functions_init)			      \
++    defaction;								      \
++									      \
++  return PTHFCT_CALL (ptr_##name, params);			      \
++} \
++compat_symbol (libc, __##name##_2_13, name, GLIBC_2_13_DEBIAN_31);
++#else
++# define FORWARD2_COMPAT(name, rettype, decl, params, defaction)
++#endif
+ 
+ /* Same as FORWARD2, only without return.  */
+ # define FORWARD_NORETURN(name, rettype, decl, params, defaction) \
+@@ -47,10 +64,19 @@ name decl								      \
+     defaction;								      \
+ 									      \
+   PTHFCT_CALL (ptr_##name, params);			      \
++} \
++rettype									      \
++name##_2_13 decl								      \
++{									      \
++  if (!__libc_pthread_functions_init)			      \
++    defaction;								      \
++									      \
++  PTHFCT_CALL (ptr_##name, params);			      \
+ }
+ 
+ # define FORWARD(name, decl, params, defretval) \
+-  FORWARD2 (name, int, decl, params, return defretval)
++  FORWARD2 (name, int, decl, params, return defretval) \
++  FORWARD2_COMPAT (name, int, decl, params, return defretval)
+ 
+ FORWARD (pthread_attr_destroy, (pthread_attr_t *attr), (attr), 0)
+ 
+@@ -107,7 +133,10 @@ FORWARD (pthread_equal, (pthread_t threa
+ 
+ /* Use an alias to avoid warning, as pthread_exit is declared noreturn.  */
+ FORWARD_NORETURN (__pthread_exit, void, (void *retval), (retval), exit (EXIT_SUCCESS))
+-strong_alias (__pthread_exit, pthread_exit);
++versioned_symbol (libc, __pthread_exit, pthread_exit, GLIBC_2_21);
++#if SHLIB_COMPAT (libc, GLIBC_2_13, GLIBC_2_21)
++compat_symbol (libc, __pthread_exit_2_13, pthread_exit, GLIBC_2_13_DEBIAN_31);
++#endif
+ 
+ 
+ FORWARD (pthread_getschedparam,
+@@ -130,6 +159,7 @@ FORWARD (pthread_mutex_unlock, (pthread_
+ 
+ 
+ FORWARD2 (pthread_self, pthread_t, (void), (), return 0)
++FORWARD2_COMPAT (pthread_self, pthread_t, (void), (), return 0)
+ 
+ 
+ FORWARD (__pthread_setcancelstate, (int state, int *oldstate), (state, oldstate),
+@@ -139,6 +169,7 @@ FORWARD (pthread_setcanceltype, (int typ
+ 
+ struct __pthread_cancelation_handler *dummy_list;
+ FORWARD2 (__pthread_get_cleanup_stack, struct __pthread_cancelation_handler **, (void), (), return &dummy_list);
++FORWARD2_COMPAT (__pthread_get_cleanup_stack, struct __pthread_cancelation_handler **, (void), (), return &dummy_list);
+ 
+ 
+ /* Fork interaction */

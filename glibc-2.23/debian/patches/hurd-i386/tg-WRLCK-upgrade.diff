@@ -1,0 +1,47 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: [PATCH] Make F_RDLCK/F_WRLCK atomic
+
+lockf(LOCK_EX) would for instance drop any existing shared lock before taking
+the exclusive lock. F_RDLCK/F_WRLCK need atomic changes, so introduce and use
+__LOCK_ATOM
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+* misc/sys/file.h (__LOCK_ATOMIC): New macro.
+* sysdeps/mach/hurd/fcntl.c (__libc_fcntl): Use __LOCK_ATOMIC along LOCK_SH and
+LOCK_EX.
+
+---
+ misc/sys/file.h           | 1 +
+ sysdeps/mach/hurd/fcntl.c | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/misc/sys/file.h b/misc/sys/file.h
+index 64e8764..a5892db 100644
+--- a/misc/sys/file.h
++++ b/misc/sys/file.h
+@@ -40,6 +40,7 @@ __BEGIN_DECLS
+ #define	LOCK_SH	1	/* Shared lock.  */
+ #define	LOCK_EX	2 	/* Exclusive lock.  */
+ #define	LOCK_UN	8	/* Unlock.  */
++#define	__LOCK_ATOMIC	16	/* Atomic update.  */
+ 
+ /* Can be OR'd in to one of the above.  */
+ #define	LOCK_NB	4	/* Don't block when locking.  */
+diff --git a/sysdeps/mach/hurd/fcntl.c b/sysdeps/mach/hurd/fcntl.c
+index 70180fa..8a8308f 100644
+--- a/sysdeps/mach/hurd/fcntl.c
++++ b/sysdeps/mach/hurd/fcntl.c
+@@ -150,8 +150,8 @@ __libc_fcntl (int fd, int cmd, ...)
+ 	  }
+ 	switch (fl->l_type)
+ 	  {
+-	  case F_RDLCK: cmd |= LOCK_SH; break;
+-	  case F_WRLCK: cmd |= LOCK_EX; break;
++	  case F_RDLCK: cmd |= LOCK_SH | __LOCK_ATOMIC; break;
++	  case F_WRLCK: cmd |= LOCK_EX | __LOCK_ATOMIC; break;
+ 	  case F_UNLCK: cmd |= LOCK_UN; break;
+ 	  default:
+ 	    errno = EINVAL;
+-- 
+tg: (9a079e2..) t/WRLCK-upgrade (depends on: baseline)

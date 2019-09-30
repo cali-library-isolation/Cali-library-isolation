@@ -1,0 +1,42 @@
+Use the realtime clock for the monotonic clock. This is of course not a proper
+implementation (which is being done in Mach), but will permit to fix at least
+the iceweasel stack.
+
+vlc however doesn't build when _POSIX_CLOCK_SELECTION is enabled but
+_POSIX_TIMERS is not, and they refuse to fix that (see #765578), so disable the
+former.
+
+---
+ sysdeps/mach/hurd/bits/posix_opt.h |    2 +-
+ sysdeps/unix/clock_gettime.c       |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+Index: eglibc-2.16/sysdeps/unix/clock_gettime.c
+===================================================================
+--- eglibc-2.16.orig/sysdeps/unix/clock_gettime.c	2012-07-23 00:41:03.000000000 +0200
++++ eglibc-2.16/sysdeps/unix/clock_gettime.c	2012-07-23 00:41:10.000000000 +0200
+@@ -100,6 +100,7 @@
+ #endif
+ 
+ #ifndef HANDLED_REALTIME
++    case CLOCK_MONOTONIC:
+     case CLOCK_REALTIME:
+       {
+ 	struct timeval tv;
+Index: eglibc-2.16/sysdeps/mach/hurd/bits/posix_opt.h
+===================================================================
+--- eglibc-2.16.orig/sysdeps/mach/hurd/bits/posix_opt.h	2012-07-23 00:41:03.000000000 +0200
++++ eglibc-2.16/sysdeps/mach/hurd/bits/posix_opt.h	2012-07-23 00:41:10.000000000 +0200
+@@ -163,10 +163,10 @@
+ #define _POSIX_THREAD_PROCESS_SHARED	-1
+ 
+ /* The monotonic clock might be available.  */
+-#define _POSIX_MONOTONIC_CLOCK	0
++#define _POSIX_MONOTONIC_CLOCK	200809L
+ 
+-/* The clock selection interfaces are available.  */
++/* The clock selection interfaces are not really available yet.  */
+-#define _POSIX_CLOCK_SELECTION	200809L
++#define _POSIX_CLOCK_SELECTION	-1
+ 
+ /* Advisory information interfaces could be available in future.  */
+ #define _POSIX_ADVISORY_INFO	0

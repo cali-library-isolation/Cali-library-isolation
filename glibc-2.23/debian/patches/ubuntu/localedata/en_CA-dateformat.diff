@@ -1,0 +1,16 @@
+# Description: en_CA date format should be "%Y-%m-%d"
+# Reference: http://www.fin.gov.nt.ca/documents/ocio/ppsg/6003.00.12%20-%20Standard%20-%20Date%20and%20Time%20Attachments.pdf
+# Ubuntu: https://launchpad.net/bugs/214730
+# Last modified: 2014-09-10
+
+--- a/localedata/locales/en_CA	2012-03-06 10:10:19.000000000 +0100
++++ b/localedata/locales/en_CA	2014-09-10 00:23:48.815221534 +0200
+@@ -125,7 +125,7 @@
+             "<U004E><U006F><U0076><U0065><U006D><U0062><U0065><U0072>";/
+             "<U0044><U0065><U0063><U0065><U006D><U0062><U0065><U0072>"
+ d_t_fmt     "<U0025><U0061><U0020><U0025><U0064><U0020><U0025><U0062><U0020><U0025><U0059><U0020><U0025><U0072><U0020><U0025><U005A>"
+-d_fmt       "<U0025><U0064><U002F><U0025><U006D><U002F><U0025><U0079>"
++d_fmt       "<U0025><U0059><U002D><U0025><U006D><U002D><U0025><U0064>"
+ t_fmt       "<U0025><U0072>"
+ am_pm       "<U0041><U004D>";"<U0050><U004D>"
+ t_fmt_ampm  "<U0025><U0049><U003A><U0025><U004D><U003A><U0025><U0053><U0020><U0025><U0070>"

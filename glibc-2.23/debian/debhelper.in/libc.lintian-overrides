@@ -1,0 +1,20 @@
+# libpthread must be stripped specially; GDB needs the non-dynamic 
+# symbol table in order to load the thread debugging library.
+LIBC: unstripped-binary-or-object */libpthread-GLIBC_VERSION.so
+
+# ld.so must be executable, otherwise the system will not work
+LIBC: shlib-with-executable-bit */ld-GLIBC_VERSION.so 0755
+
+# It is normal that the ELF dynamic linker does not need any other 
+# library
+LIBC: shared-lib-without-dependency-information */ld-GLIBC_VERSION.so
+
+# dependency on debconf is not needed, as glibc has a fallback to tty 
+LIBC: missing-debconf-dependency-for-preinst
+
+# this is a false positive because the string "ldconfig" is in preinst
+LIBC: preinst-calls-ldconfig
+
+# we indeed embed a fork of libidn. We don't want a loop between libc and libidn
+# anyway
+LIBC: embedded-library */libcidn-GLIBC_VERSION.so: libidn

@@ -1,0 +1,231 @@
+#!/bin/sh
+set -e
+export LC_ALL=C
+
+type=$1
+preversion=$2
+
+package_name()
+{
+    if dpkg --assert-multi-arch 2>/dev/null; then
+        echo LIBC:${DPKG_MAINTSCRIPT_ARCH}
+    else
+        echo LIBC
+    fi
+}
+
+# element() is a helper function for file-rc:
+element() {
+    local element list IFS
+
+    element="$1"
+
+    [ "$2" = "in" ] && shift
+    list="$2"
+    [ "$list" = "-" ] && return 1
+    [ "$list" = "*" ] && return 0
+
+    IFS=","
+    set -- $list
+    case $element in
+	"$1"|"$2"|"$3"|"$4"|"$5"|"$6"|"$7"|"$8"|"$9")
+	    return 0
+    esac
+    return 1
+}
+
+# filerc (runlevel, service) returns /etc/init.d/service, if service is
+# running in $runlevel:
+filerc() {
+    local runlevel basename
+    runlevel=$1
+    basename=$2
+    while read LINE
+    do
+	case $LINE in
+	    \#*|"") continue
+	esac
+
+	set -- $LINE
+	SORT_NO="$1"; STOP="$2"; START="$3"; CMD="$4"
+	[ "$CMD" = "/etc/init.d/$basename" ] || continue
+
+	if element "$runlevel" in "$START" || element "S" in "$START"
+	then
+	    echo "/etc/init.d/$basename"
+	    return 0
+	fi
+    done < /etc/runlevel.conf
+    echo ""
+}
+
+checkpkgver () {
+    local status pkg
+    pkg=$1
+    status=$(dpkg -s $pkg 2>/dev/null | grep ^Status: | sed -e 's/^Status: \(.*\) \(.*\) \(.*\)/\3/g')
+    if [ -n "$status" ] && [ "$status" != "not-installed" ] && [ "$status" != "config-files" ]; then
+	echo $(dpkg -s $pkg 2>/dev/null | grep ^Version: | sed -e 's/^Version: *//');
+    fi
+}
+
+if [ "$type" = "configure" ]
+then
+    # We don't use a registry anymore, remove the old file
+    rm -f /etc/ld.so.hwcappkgs
+ 
+    # /etc/ld.so.nohwcap code:
+    __NOHWCAP__
+
+    # Load debconf module if available
+    if [ -f /usr/share/debconf/confmodule ] ; then
+	. /usr/share/debconf/confmodule
+    fi
+
+    if [ -n "$preversion" ]; then
+	if [ ! -d /var/mail ] && [ ! -L /var/mail ]; then
+	    ln -sf spool/mail /var/mail
+	fi
+	if dpkg --compare-versions "$preversion" lt GLIBC_VERSION; then
+	    check=""
+	    [ -f /var/run/services.need_restart ] && check=$(cat /var/run/services.need_restart 2>/dev/null)
+	    # Change service names back into package names, so that we can
+	    # double-check package installation.
+	    check=$(echo "$check" | \
+	            sed -e's/\bapache2\b/apache2.2-common/g' \
+	                -e's/\batd\b/at/g' \
+	                -e's/\bdovecot\b/dovecot-common/g' \
+	                -e's/\bexim4\b/exim4-base/g' \
+	                -e's/\blpd\b/lpr/g' \
+	                -e's/\blpd-ppd\b/lpr-ppd/g' \
+	                -e's/\bmysql\b/mysql-server/g' \
+	                -e's/\bsaslauthd\b/sasl2-bin/g' \
+	    )
+
+	    # Check to see which of the services that were running at unpack
+	    # time are still around
+            # the following substitution processes the check variable
+            # and returns results in the services variable
+	    # NSS services check: 
+	    __NSS_CHECK__
+	    # If there are services that we *stopped* in the preinst, don't
+	    # forget to restart them now
+	    if [ -e /var/run/services.need_start ]; then
+		services="$(cat /var/run/services.need_start) $services"
+	    fi
+	    if [ -n "$services" ]; then
+		echo "Restarting services possibly affected by the upgrade:"
+		failed=""
+		for service in $services; do
+		    # We can't just use a generic rewrite here, as it was
+		    # samba in wheezy and smbd in jessie, which confuses.
+		    if [ "$service" = "samba" ]; then
+			if [ -x /etc/init.d/smbd ] || [ -f /etc/init/smbd ]; then
+			    service="smbd"
+			fi
+		    fi
+		    if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+			idl="invoke-rc.d ${service}"
+			idlopt="restart"
+		    elif [ -f /usr/share/file-rc/rc ] || [ -f /usr/lib/file-rc/rc ] && [ -f /etc/runlevel.conf ]; then
+			idl=$(filerc $rl $service)
+			idlopt="restart"
+		    else
+			idl=$(ls /etc/rc${rl}.d/S??${service} 2> /dev/null | head -1)
+			idlopt="restart"
+		    fi
+		    echo -n "  $service: restarting..."
+		    if $idl $idlopt > /dev/null 2>&1; then
+			echo "done."
+		    else
+			echo "FAILED! ($?)"
+			failed="$service $failed"
+		    fi
+		done
+	
+		echo
+		if [ -n "$failed" ]; then
+		    if [ -f /usr/share/debconf/confmodule ] ; then
+			db_fset glibc/restart-failed seen false
+			db_subst glibc/restart-failed services "$failed"
+			if [ "$RELEASE_UPGRADE_MODE" = desktop ]; then
+			    db_input medium glibc/restart-failed || true
+			else
+			    db_input critical glibc/restart-failed || true
+			fi
+			db_go || true
+		    else
+			echo "The following services failed to start: $failed"
+			echo
+			echo "You will need to start these manually by running \`/etc/init.d/<service> start'"
+			echo "If the service still fails to start, you may need to file a bug on"
+			echo "$(package_name) or the service involved."
+			frontend=`echo "$DEBIAN_FRONTEND" | tr '[:upper:]' '[:lower:]'`
+			if [ "$frontend" != noninteractive ]; then
+			    echo
+			    echo -n "Press ENTER to continue: "
+			    read foo
+			fi
+		    fi
+		else
+		    echo "Services restarted successfully."
+		    rm -f /var/run/services.need_start /var/run/services.need_restart
+		fi
+	
+		# Shut down the frontend, to make sure none of the
+		# restarted services keep a connection open to it
+		if [ -f /usr/share/debconf/confmodule ] ; then
+		    db_stop
+		fi
+	    else
+		echo "Nothing to restart."
+	    fi
+	fi # end upgrading and $preversion lt GLIBC_VERSION
+	# give a reboot notification on al upgrades (LP: #1546457)
+	if [ -x /usr/share/update-notifier/notify-reboot-required ]; then
+	    /usr/share/update-notifier/notify-reboot-required
+	fi
+    fi # Upgrading
+
+    # Restart init.  Currently handles chroots, systemd and upstart, and
+    # assumes anything else is going to not fail at behaving like
+    # sysvinit:
+    TELINIT=yes
+    if ischroot 2>/dev/null; then
+        # Don't bother trying to re-exec init from a chroot:
+        TELINIT=no
+    elif [ -d /run/systemd/system ]; then
+        # Skip if systemd is the active PID 1, since systemd doesn't
+        # need a reexec for a clean shutdown
+        TELINIT=no
+    elif [ -x "`which initctl`" ]; then
+        UPSTART=$(initctl version 2>/dev/null | awk '/upstart/ {print $3}' | tr -d ')')
+        if dpkg --compare-versions "$UPSTART" lt-nl 1.6.1; then
+            # This is an old upstart that can't re-exec statefully:
+            TELINIT=no
+            touch /var/run/init.upgraded
+        fi
+    fi
+    if [ "$TELINIT" = "yes" ]; then
+        telinit u 2>/dev/null || true ; sleep 1
+    fi
+fi
+
+# We now use the multiarch triplet instead of the GNU triplet for the ld.so
+# configuration file, in order to keep a stable path. Remove the old file.
+case ${DPKG_MAINTSCRIPT_ARCH:-$(dpkg --print-architecture)} in
+    hurd-i386)
+        dpkg-maintscript-helper rm_conffile /etc/ld.so.conf.d/i486-gnu.conf 2.19-11~ libc0.3:hurd-i386 -- "$@"
+        dpkg-maintscript-helper rm_conffile /etc/ld.so.conf.d/i486-gnu-gnu.conf 2.19-11~ libc0.3:hurd-i386 -- "$@"
+        ;;
+    i386)
+        dpkg-maintscript-helper rm_conffile /etc/ld.so.conf.d/i486-linux-gnu.conf 2.19-4~ libc6:i386 -- "$@"
+        dpkg-maintscript-helper rm_conffile /etc/ld.so.conf.d/i686-linux-gnu.conf 2.19-13~ libc6:i386 -- "$@"
+        ;;
+    kfreebsd-i386)
+        dpkg-maintscript-helper rm_conffile /etc/ld.so.conf.d/i486-kfreebsd-gnu.conf 2.19-11~ libc0.1:kfreebsd-i386 -- "$@"
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

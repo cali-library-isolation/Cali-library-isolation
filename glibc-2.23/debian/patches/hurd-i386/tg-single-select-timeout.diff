@@ -1,0 +1,35 @@
+commit fffcbbb0b5ff8864086f7b58fdbb8aa4c71943d0
+Author: Richard Braun <rbraun@sceen.net>
+Date:   Mon Dec 17 09:57:41 2012 +0000
+
+    Fix _hurd_select for single fd sets
+    
+    The function attempts to optimize this case by performing one IPC system call
+    with the timeout included among the parameters, but in the absence of a reply,
+    it will call mach_msg again with the same timeout later, effectively doubling
+    the total timeout of the select/poll call.
+    
+    Remove this optimization for the time being.
+    
+    * hurd/hurdselect.c (_hurd_select): Always call __io_select with no timeout.
+
+---
+ hurdselect.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/hurd/hurdselect.c b/hurd/hurdselect.c
+index 21ba5f4..a02c7be 100644
+--- a/hurd/hurdselect.c
++++ b/hurd/hurdselect.c
+@@ -236,10 +236,7 @@ _hurd_select (int nfds,
+ 	  {
+ 	    int type = d[i].type;
+ 	    d[i].reply_port = __mach_reply_port ();
+-	    err = __io_select (d[i].io_port, d[i].reply_port,
+-			       /* Poll only if there's a single descriptor.  */
+-			       (firstfd == lastfd) ? to : 0,
+-			       &type);
++	    err = __io_select (d[i].io_port, d[i].reply_port, 0, &type);
+ 	    switch (err)
+ 	      {
+ 	      case MACH_RCV_TIMED_OUT:

@@ -1,0 +1,5 @@
+# DEFAULT			Earliest symbol set
+# ---------------		------------------------------
+DEFAULT				GLIBC_2.3
+libc=0.1       
+libm=1

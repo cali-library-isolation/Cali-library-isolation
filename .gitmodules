@@ -1,0 +1,3 @@
+[submodule "libnsjail/src/nsjail/kafel"]
+	path = libnsjail/src/nsjail/kafel
+	url = https://github.com/google/kafel.git

@@ -1,0 +1,67 @@
+Index: glibc/sysdeps/pthread/timer_routines.c
+===================================================================
+--- glibc.orig/sysdeps/pthread/timer_routines.c
++++ glibc/sysdeps/pthread/timer_routines.c
+@@ -29,7 +29,7 @@
+ #include <sys/syscall.h>
+ 
+ #include "posix-timer.h"
+-#include <nptl/pthreadP.h>
++//#include <nptl/pthreadP.h>
+ 
+ 
+ /* Number of threads used.  */
+@@ -395,6 +395,9 @@ thread_func (void *arg)
+ 		    {
+ 		      timespec_add (&timer->expirytime, &timer->expirytime,
+ 				    &timer->value.it_interval);
++#ifndef DELAYTIMER_MAX
++#define DELAYTIMER_MAX INT_MAX
++#endif
+ 		      if (timer->overrun_count < DELAYTIMER_MAX)
+ 			++timer->overrun_count;
+ 		    }
+@@ -481,7 +484,7 @@ __timer_thread_wakeup (struct thread_nod
+   pthread_cond_broadcast (&thread->cond);
+ }
+ 
+-
++#if 0
+ /* Compare two pthread_attr_t thread attributes for exact equality.
+    Returns 1 if they are equal, otherwise zero if they are not equal
+    or contain illegal values.  This version is NPTL-specific for
+@@ -506,6 +509,7 @@ thread_attr_compare (const pthread_attr_
+ 		  && memcmp (ileft->cpuset, iright->cpuset,
+ 			     ileft->cpusetsize) == 0)));
+ }
++#endif
+ 
+ 
+ /* Search the list of active threads and find one which has matching
+@@ -514,6 +518,7 @@ struct thread_node *
+ __timer_thread_find_matching (const pthread_attr_t *desired_attr,
+ 			      clockid_t desired_clock_id)
+ {
++#if 0
+   struct list_head *iter = list_first (&thread_active_list);
+ 
+   while (iter != list_null (&thread_active_list))
+@@ -526,6 +531,7 @@ __timer_thread_find_matching (const pthr
+ 
+       iter = list_next (iter);
+     }
++#endif
+ 
+   return NULL;
+ }
+Index: glibc/libpthread/sysdeps/pthread/Makefile
+===================================================================
+--- glibc.orig/libpthread/sysdeps/pthread/Makefile
++++ glibc/libpthread/sysdeps/pthread/Makefile
+@@ -1,3 +1,6 @@
++ifeq ($(subdir),rt)
++librt-sysdep_routines += timer_routines
++endif
+ ifeq ($(subdir),posix)
+   # FIXME: this is not getting $(pthread-version) from libpthread/Makefile!
+ CFLAGS-confstr.c += -DLIBPTHREAD_VERSION='"libpthread $(pthread-version)"'

@@ -1,0 +1,19 @@
+Set the default stack size to 8MiB like on Linux, to avoid surprises
+with packages which assume the Linuxish default.
+
+---
+ pt-sysdep.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Index: glibc-2.19/libpthread/sysdeps/mach/hurd/pt-sysdep.h
+===================================================================
+--- glibc-2.19.orig/libpthread/sysdeps/mach/hurd/pt-sysdep.h
++++ glibc-2.19/libpthread/sysdeps/mach/hurd/pt-sysdep.h
+@@ -26,7 +26,7 @@
+ #define _POSIX_THREAD_THREADS_MAX	64
+ 
+ /* The default stack size.  */
+-#define PTHREAD_STACK_DEFAULT	(2 * 1024 * 1024)
++#define PTHREAD_STACK_DEFAULT	(8 * 1024 * 1024)
+ 
+ #define PTHREAD_SYSDEP_MEMBERS \
+   thread_t kernel_thread;      \

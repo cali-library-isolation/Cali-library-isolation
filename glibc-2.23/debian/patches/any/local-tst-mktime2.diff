@@ -1,0 +1,14 @@
+---
+ time/tst-mktime2.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/time/tst-mktime2.c
++++ b/time/tst-mktime2.c
+@@ -4,6 +4,7 @@
+ #include <time.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <limits.h>
+ 
+ /* True if the arithmetic type T is signed.  */
+ #define TYPE_SIGNED(t) (! ((t) 0 < (t) -1))

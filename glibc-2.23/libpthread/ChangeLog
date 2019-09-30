@@ -1,0 +1,6 @@
+51839d398b0f9885a17ab5c0768b8dec4dd9eb79 is the last commit imported from CVS.
+All commits after that one have valid author and committer information.
+
+Use this to examine the change log for earlier changes:
+
+    $ git show 51839d398b0f9885a17ab5c0768b8dec4dd9eb79:ChangeLog

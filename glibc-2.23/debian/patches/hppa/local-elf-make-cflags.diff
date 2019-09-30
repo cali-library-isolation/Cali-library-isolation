@@ -1,0 +1,13 @@
+Index: eglibc-2.18/elf/Makefile
+===================================================================
+--- eglibc-2.18.orig/elf/Makefile	2014-02-25 20:47:20.859469989 -0500
++++ eglibc-2.18/elf/Makefile	2014-02-25 20:47:20.769469646 -0500
+@@ -424,7 +424,7 @@
+ libof-ldconfig = ldconfig
+ CFLAGS-dl-cache.c = $(SYSCONF-FLAGS)
+ CFLAGS-cache.c = $(SYSCONF-FLAGS)
+-CFLAGS-rtld.c = $(SYSCONF-FLAGS)
++CFLAGS-rtld.c += $(SYSCONF-FLAGS)
+ 
+ cpp-srcs-left := $(all-rtld-routines:=.os)
+ lib := rtld

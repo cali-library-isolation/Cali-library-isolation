@@ -1,0 +1,23 @@
+2016-02-29  Aurelien Jarno  <aurelien@aurel32.net>
+
+	* sysdeps/generic/libnsl.abilist: New file.
+	* sysdeps/generic/libutil.abilist: New file.
+	* sysdeps/mach/hurd/libhurduser.abilist: New file.
+	* sysdeps/mach/libmachuser.abilist: New file.
+
+--- /dev/null
++++ b/sysdeps/generic/libnsl.abilist
+@@ -0,0 +1 @@
++
+--- /dev/null
++++ b/sysdeps/generic/libutil.abilist
+@@ -0,0 +1 @@
++
+--- /dev/null
++++ b/sysdeps/mach/hurd/libhurduser.abilist
+@@ -0,0 +1 @@
++
+--- /dev/null
++++ b/sysdeps/mach/libmachuser.abilist
+@@ -0,0 +1 @@
++

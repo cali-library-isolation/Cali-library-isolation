@@ -1,0 +1,10 @@
+#ifndef LIBIPC_COMMON_HEADER_H
+#define LIBIPC_COMMON_HEADER_H
+
+#ifdef HAVE_MREMAP
+#undef HAVE_MREMAP
+#endif
+
+#define HAVE_REMAP 0
+
+#endif //LIBIPC_COMMON_HEADER_H

@@ -1,0 +1,57 @@
+---
+ abi-tags     |    2 +-
+ configure    |    4 +++-
+ configure.ac |    4 +++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
+
+--- a/abi-tags
++++ b/abi-tags
+@@ -22,7 +22,7 @@
+ 
+ .*-sun-solaris2.*	2	2.0.0	# just an arbitrary value
+ 
+-.*-.*-freebsd.*-gnu.*	3	4.0.0	# earliest compatible kernel version
++.*-.*-kfreebsd.*	3	5.4.0	# earliest compatible kernel version
+ 
+ .*-.*-knetbsd.*-gnu.*	4	1.6.0	# earliest compatible kernel version
+ 
+--- a/configure
++++ b/configure
+@@ -3869,7 +3869,7 @@
+ ###
+ if test -z "$enable_hacker_mode" && test x"$libc_config_ok" != xyes; then
+   case "$machine-$host_os" in
+-  *-linux* | *-gnu*)
++  *-linux* | *-gnu* | *-kfreebsd*)
+     ;;
+   *)
+     as_fn_error $? "
+@@ -3946,6 +3946,8 @@
+   base_os=mach/hurd ;;
+ linux*)
+   base_os=unix/sysv ;;
++k*bsd*)
++  base_os=unix/bsd/bsd4.4 ;;
+ esac
+ 
+ # For sunos4.1.1, try sunos4.1.1, then sunos4.1, then sunos4, then sunos.
+--- a/configure.ac
++++ b/configure.ac
+@@ -597,7 +597,7 @@
+ ###
+ if test -z "$enable_hacker_mode" && test x"$libc_config_ok" != xyes; then
+   case "$machine-$host_os" in
+-  *-linux* | *-gnu*)
++  *-linux* | *-gnu* | *-kfreebsd*)
+     ;;
+   *)
+     AC_MSG_ERROR([
+@@ -669,6 +669,8 @@
+   base_os=mach/hurd ;;
+ linux*)
+   base_os=unix/sysv ;;
++k*bsd*)
++  base_os=unix/bsd/bsd4.4 ;;
+ esac
+ 
+ # For sunos4.1.1, try sunos4.1.1, then sunos4.1, then sunos4, then sunos.

@@ -1,0 +1,30 @@
+commit fe43d0f464fa97f0cb4c08f3303f6a7aadd638f9
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Sun Mar 20 16:44:44 2016 +0100
+
+    hurd: Break errnos.d / libc-modules.h dependency loop
+    
+    Generating errnos.d does not actually need libc-modules.h.
+    
+    * sysdeps/mach/hurd/Makefile ($(common-objpfx)errnos.d): Strip
+    "-include $(common-objpfx)libc-modules.h" from CPPFLAGS, and do not
+    depend on libc-modules.h,
+
+diff --git a/sysdeps/mach/hurd/Makefile b/sysdeps/mach/hurd/Makefile
+index 3845c57..cfaeed3 100644
+--- a/sysdeps/mach/hurd/Makefile
++++ b/sysdeps/mach/hurd/Makefile
+@@ -79,9 +79,11 @@ endef
+ # the headers we want to search for Mach error codes, listed above (and
+ # incidentally, all other headers those include).
+ -include $(common-objpfx)errnos.d
+-$(common-objpfx)errnos.d: $(mach-errnos-deps) libc-modules.h
++$(common-objpfx)errnos.d: $(mach-errnos-deps)
+ 	$(mach-errno-h) | \
+-	$(CC) $(CFLAGS) $(CPPFLAGS) -M -x c - | \
++	$(CC) $(CFLAGS) \
++	    $(subst -include $(common-objpfx)libc-modules.h,,$(CPPFLAGS)) \
++	    -M -x c - | \
+ 	sed $(sed-remove-objpfx) -e 's,- *:,mach-errnos-deps :=,' \
+ 	    -e 's, \.\./, $(..),g' > $@t
+ 	mv -f $@t $@

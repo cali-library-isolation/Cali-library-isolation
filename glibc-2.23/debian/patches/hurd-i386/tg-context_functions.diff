@@ -1,0 +1,575 @@
+Subject: [PATCH] getcontext, makecontext, setcontext, swapcontext
+
+From: Thomas Schwinge <thomas@codesourcery.com>
+
+Adapted from the Linux x86 functions.
+
+Not thoroughly tested, but manual testing as well as glibc tests look fine, and
+manual -lpthread testing also looks fine (within the given bounds for a new
+stack to be used with makecontext).
+
+---
+ sysdeps/mach/hurd/i386/Makefile             |    5 ++
+ sysdeps/mach/hurd/i386/getcontext.S         |   74 +++++++++++++++
+ sysdeps/mach/hurd/i386/makecontext-helper.c |   69 ++++++++++++++
+ sysdeps/mach/hurd/i386/makecontext.S        |  130 +++++++++++++++++++++++++++
+ sysdeps/mach/hurd/i386/setcontext.S         |   92 +++++++++++++++++++
+ sysdeps/mach/hurd/i386/swapcontext.S        |  110 +++++++++++++++++++++++
+ sysdeps/mach/hurd/i386/ucontext_i.sym       |   29 ++++++
+ 7 files changed, 509 insertions(+)
+
+diff --git a/sysdeps/mach/hurd/i386/Makefile b/sysdeps/mach/hurd/i386/Makefile
+index 5f98809..9e1a978 100644
+--- a/sysdeps/mach/hurd/i386/Makefile
++++ b/sysdeps/mach/hurd/i386/Makefile
+@@ -6,3 +6,8 @@ endif
+ ifeq ($(subdir),debug)
+ gen-as-const-headers += signal-defines.sym
+ endif
++
++ifeq ($(subdir),stdlib)
++gen-as-const-headers += ucontext_i.sym
++sysdep_routines += makecontext-helper
++endif
+diff --git a/sysdeps/mach/hurd/i386/getcontext.S b/sysdeps/mach/hurd/i386/getcontext.S
+new file mode 100644
+index 0000000..b456158
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/getcontext.S
+@@ -0,0 +1,74 @@
++/* Save current context.
++   Copyright (C) 2001, 2002, 2003, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#include "ucontext_i.h"
++
++
++ENTRY(__getcontext)
++	/* Load address of the context data structure.  */
++	movl	4(%esp), %eax
++
++	/* Return value of getcontext.  EAX is the only register whose
++	   value is not preserved.  */
++	movl	$0, oEAX(%eax)
++
++	/* Save the 32-bit register values and the return address.  */
++	movl	%ecx, oECX(%eax)
++	movl	%edx, oEDX(%eax)
++	movl	%edi, oEDI(%eax)
++	movl	%esi, oESI(%eax)
++	movl	%ebp, oEBP(%eax)
++	movl	(%esp), %ecx
++	movl	%ecx, oEIP(%eax)
++	leal	4(%esp), %ecx		/* Exclude the return address.  */
++	movl	%ecx, oESP(%eax)
++	movl	%ebx, oEBX(%eax)
++
++	/* Save the FS segment register.  We don't touch the GS register
++	   since it is used for threads.  */
++	xorl	%edx, %edx
++	movw	%fs, %dx
++	movl	%edx, oFS(%eax)
++
++	leal	oFPREGS(%eax), %ecx
++	/* Save the floating-point context.  */
++	fnstenv	(%ecx)
++	/* And load it right back since the processor changes the mask.
++	   Intel thought this opcode to be used in interrupt handlers which
++	   would block all exceptions.  */
++	fldenv	(%ecx)
++
++	/* Save the current signal mask.  */
++	subl	$12, %esp
++	cfi_adjust_cfa_offset (12)
++	leal	oSIGMASK(%eax), %eax
++	movl	%eax, 8(%esp)
++	movl	$0, 4(%esp)
++	movl	$SIG_BLOCK, (%esp)
++	call	JUMPTARGET (__sigprocmask)
++	addl	$12, %esp
++	cfi_adjust_cfa_offset (-12)
++	/* Propagate %eax (and errno, in case).  */
++
++	ret
++PSEUDO_END(__getcontext)
++
++weak_alias (__getcontext, getcontext)
+diff --git a/sysdeps/mach/hurd/i386/makecontext-helper.c b/sysdeps/mach/hurd/i386/makecontext-helper.c
+new file mode 100644
+index 0000000..6db3b7e
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/makecontext-helper.c
+@@ -0,0 +1,69 @@
++/* Helper for makecontext: handle threadvars.
++   Copyright (C) 2013 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <hurd/threadvar.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <ucontext.h>
++
++
++void
++__makecontext_helper (ucontext_t *ucp)
++{
++  if (__hurd_threadvar_stack_mask == 0)
++    {
++      /* We are not using threads, so per init-first.c:init, the threadvars
++         live in a malloced space, addressed relative to the base of the
++         virtual address space.  Just keep using that one.  */
++    }
++  else
++    {
++      /* The following is only prepared to work with libpthread, which only
++         keeps the threadvars at the bottom of the stack -- contrary to
++         libthreads, which also puts additional data there.  */
++
++      void *s = ucp->uc_stack.ss_sp;
++      size_t s_size = ucp->uc_stack.ss_size;
++
++      /* Is the new stack suitable?  Check that that the last threadvar
++         occupies the last storage unit within the bounds of the new stack.
++         Alignment according to (sp & __hurd_threadvar_stack_mask) == sp is not
++         actually a requirement (though, in practice it often will be).  */
++      if (__hurd_threadvar_location_from_sp (_HURD_THREADVAR_MAX, s)
++          != s + s_size)
++        {
++          /* Instead of having makecontext return an error, we bail out the
++             hard way, as we can't expect its caller to be able to properly
++             react to this situation.  */
++          fprintf (stderr,
++                   "*** makecontext: a stack at %p with size %#x is not "
++                   "usable with threadvars\n",
++                   s, s_size);
++          abort ();
++        }
++
++      /* Copy the threadvars to the new stack.  */
++      void *t_old = __hurd_threadvar_location (0);
++      void *t_new = __hurd_threadvar_location_from_sp (0, s);
++      size_t t_size = __hurd_threadvar_max * sizeof (unsigned long int);
++      memcpy (t_new, t_old, t_size);
++      /* Account for the space taken by the threadvars.  */
++      ucp->uc_stack.ss_size -= t_size;
++    }
++}
+diff --git a/sysdeps/mach/hurd/i386/makecontext.S b/sysdeps/mach/hurd/i386/makecontext.S
+new file mode 100644
+index 0000000..7f3f6b0
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/makecontext.S
+@@ -0,0 +1,130 @@
++/* Create new context.
++   Copyright (C) 2001,2002,2005,2007,2008,2009 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#include "ucontext_i.h"
++
++
++ENTRY(__makecontext)
++	movl	4(%esp), %eax
++	subl	$4, %esp
++	cfi_adjust_cfa_offset (4)
++	movl	%eax, (%esp)
++	call	HIDDEN_JUMPTARGET (__makecontext_helper)
++	addl	$4, %esp
++	cfi_adjust_cfa_offset (-4)
++
++	movl	4(%esp), %eax
++
++	/* Load the address of the function we are supposed to run.  */
++	movl	8(%esp), %ecx
++
++	/* Compute the address of the stack.  The information comes from
++	   to us_stack element.  */
++	movl	oSS_SP(%eax), %edx
++	movl	%ecx, oEIP(%eax)
++	addl	oSS_SIZE(%eax), %edx
++
++	/* Remember the number of parameters for the exit handler since
++	   it has to remove them.  We store the number in the EBX register
++	   which the function we will call must preserve.  */
++	movl	12(%esp), %ecx
++	movl	%ecx, oEBX(%eax)
++
++	/* Make room on the new stack for the parameters.
++	   Room for the arguments, return address (== L(exitcode)) and
++	   oLINK pointer is needed.  One of the pointer sizes is subtracted
++	   after aligning the stack.  */
++	negl	%ecx
++	leal	-4(%edx,%ecx,4), %edx
++	negl	%ecx
++
++	/* Align the stack.  */
++	andl	$0xfffffff0, %edx
++	subl	$4, %edx
++
++	/* Store the future stack pointer.  */
++	movl	%edx, oESP(%eax)
++
++	/* Put the next context on the new stack (from the uc_link
++	   element).  */
++	movl	oLINK(%eax), %eax
++	movl	%eax, 4(%edx,%ecx,4)
++
++	/* Copy all the parameters.  */
++	jecxz	2f
++1:	movl	12(%esp,%ecx,4), %eax
++	movl	%eax, (%edx,%ecx,4)
++	decl	%ecx
++	jnz	1b
++2:
++
++	/* If the function we call returns we must continue with the
++	   context which is given in the uc_link element.  To do this
++	   set the return address for the function the user provides
++	   to a little bit of helper code which does the magic (see
++	   below).  */
++#ifdef PIC
++	call	1f
++	cfi_adjust_cfa_offset (4)
++1:	popl	%ecx
++	cfi_adjust_cfa_offset (-4)
++	addl	$L(exitcode)-1b, %ecx
++	movl	%ecx, (%edx)
++#else
++	movl	$L(exitcode), (%edx)
++#endif
++	/* 'makecontext' returns no value.  */
++	ret
++
++	/* This is the helper code which gets called if a function which
++	   is registered with 'makecontext' returns.  In this case we
++	   have to install the context listed in the uc_link element of
++	   the context 'makecontext' manipulated at the time of the
++	   'makecontext' call.  If the pointer is NULL the process must
++	   terminate.  */
++	cfi_endproc
++L(exitcode):
++	/* This removes the parameters passed to the function given to
++	   'makecontext' from the stack.  EBX contains the number of
++	   parameters (see above).  */
++	leal	(%esp,%ebx,4), %esp
++
++#ifdef	PIC
++	call	1f
++1:	popl	%ebx
++	addl	$_GLOBAL_OFFSET_TABLE_+[.-1b], %ebx
++#endif
++	cmpl	$0, (%esp)		/* Check the next context.  */
++	je	2f			/* If it is zero exit.  */
++
++	call	JUMPTARGET(__setcontext)
++	/* If this returns (which can happen if the syscall fails) we'll
++	   exit the program with the return error value (-1).  */
++
++	movl	%eax, (%esp)
++2:	call	HIDDEN_JUMPTARGET(exit)
++	/* The 'exit' call should never return.  In case it does cause
++	   the process to terminate.  */
++	hlt
++	cfi_startproc
++END(__makecontext)
++
++weak_alias (__makecontext, makecontext)
+diff --git a/sysdeps/mach/hurd/i386/setcontext.S b/sysdeps/mach/hurd/i386/setcontext.S
+new file mode 100644
+index 0000000..2294eb6
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/setcontext.S
+@@ -0,0 +1,92 @@
++/* Install given context.
++   Copyright (C) 2001, 2002, 2003, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#include "ucontext_i.h"
++
++
++ENTRY(__setcontext)
++	/* Load address of the context data structure.  */
++	movl	4(%esp), %eax
++
++	/* Get the current signal mask.  */
++	subl	$12, %esp
++	cfi_adjust_cfa_offset (12)
++	movl	$0, 8(%esp)
++	leal	oSIGMASK(%eax), %eax
++	movl	%eax, 4(%esp)
++	movl	$SIG_SETMASK, (%esp)
++	call	JUMPTARGET (__sigprocmask)
++	addl	$12, %esp
++	cfi_adjust_cfa_offset (-12)
++	testl	%eax, %eax
++	jne	L(pseudo_end)
++
++	/* EAX was modified, reload it.  */
++	movl	4(%esp), %eax
++
++	/* Restore the floating-point context.  Not the registers, only the
++	   rest.  */
++	leal	oFPREGS(%eax), %ecx
++	fldenv	(%ecx)
++
++	/* Restore the FS segment register.  We don't touch the GS register
++	   since it is used for threads.  */
++	movl	oFS(%eax), %ecx
++	movw	%cx, %fs
++
++	/* Fetch the address to return to.  */
++	movl	oEIP(%eax), %ecx
++
++	/* Load the new stack pointer.  */
++	cfi_def_cfa (eax, 0)
++	cfi_offset (edi, oEDI)
++	cfi_offset (esi, oESI)
++	cfi_offset (ebp, oEBP)
++	cfi_offset (ebx, oEBX)
++	cfi_offset (edx, oEDX)
++	cfi_offset (ecx, oECX)
++	movl	oESP(%eax), %esp
++
++	/* Push the return address on the new stack so we can return there.  */
++	pushl	%ecx
++
++	/* Load the values of all the 32-bit registers (except ESP).
++	   Since we are loading from EAX, it must be last.  */
++	movl	oEDI(%eax), %edi
++	movl	oESI(%eax), %esi
++	movl	oEBP(%eax), %ebp
++	movl	oEBX(%eax), %ebx
++	movl	oEDX(%eax), %edx
++	movl	oECX(%eax), %ecx
++	movl	oEAX(%eax), %eax
++
++	/* End FDE here, we fall into another context.  */
++	cfi_endproc
++	cfi_startproc
++
++	/* The following 'ret' will pop the address of the code and jump
++	   to it.  */
++
++L(pseudo_end):
++	ret
++PSEUDO_END(__setcontext)
++
++weak_alias (__setcontext, setcontext)
+diff --git a/sysdeps/mach/hurd/i386/swapcontext.S b/sysdeps/mach/hurd/i386/swapcontext.S
+new file mode 100644
+index 0000000..fb45b70
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/swapcontext.S
+@@ -0,0 +1,110 @@
++/* Save current context and install the given one.
++   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#include "ucontext_i.h"
++
++
++ENTRY(__swapcontext)
++	/* Load address of the context data structure we save in.  */
++	movl	4(%esp), %eax
++
++	/* Return value of swapcontext.  EAX is the only register whose
++	   value is not preserved.  */
++	movl	$0, oEAX(%eax)
++
++	/* Save the 32-bit register values and the return address.  */
++	movl	%ecx, oECX(%eax)
++	movl	%edx, oEDX(%eax)
++	movl	%edi, oEDI(%eax)
++	movl	%esi, oESI(%eax)
++	movl	%ebp, oEBP(%eax)
++	movl	(%esp), %ecx
++	movl	%ecx, oEIP(%eax)
++	leal	4(%esp), %ecx
++	movl	%ecx, oESP(%eax)
++	movl	%ebx, oEBX(%eax)
++
++	/* Save the FS segment register.  */
++	xorl	%edx, %edx
++	movw	%fs, %dx
++	movl	%edx, oFS(%eax)
++
++	leal	oFPREGS(%eax), %ecx
++	/* Save the floating-point context.  */
++	fnstenv	(%ecx)
++
++	/* Load address of the context data structure we have to load.  */
++	movl	8(%esp), %ecx
++
++	/* Save the current signal mask and install the new one.  */
++	subl	$12, %esp
++	cfi_adjust_cfa_offset (12)
++	leal	oSIGMASK(%eax), %eax
++	movl	%eax, 8(%esp)
++	leal	oSIGMASK(%ecx), %eax
++	movl	%eax, 4(%esp)
++	movl	$SIG_SETMASK, (%esp)
++	call	JUMPTARGET (__sigprocmask)
++	addl	$12, %esp
++	cfi_adjust_cfa_offset (-12)
++	testl	%eax, %eax
++	jne	L(pseudo_end)
++
++	/* EAX was modified, reload it.  */
++	movl	8(%esp), %eax
++
++	/* Restore the floating-point context.  Not the registers, only the
++	   rest.  */
++	leal	oFPREGS(%eax), %ecx
++	fldenv	(%ecx)
++
++	/* Restore the FS segment register.  We don't touch the GS register
++	   since it is used for threads.  */
++	movl	oFS(%eax), %edx
++	movw	%dx, %fs
++
++	/* Fetch the address to return to.  */
++	movl	oEIP(%eax), %ecx
++
++	/* Load the new stack pointer.  */
++	movl	oESP(%eax), %esp
++
++	/* Push the return address on the new stack so we can return there.  */
++	pushl	%ecx
++
++	/* Load the values of all the 32-bit registers (except ESP).
++	   Since we are loading from EAX, it must be last.  */
++	movl	oEDI(%eax), %edi
++	movl	oESI(%eax), %esi
++	movl	oEBP(%eax), %ebp
++	movl	oEBX(%eax), %ebx
++	movl	oEDX(%eax), %edx
++	movl	oECX(%eax), %ecx
++	movl	oEAX(%eax), %eax
++
++	/* The following 'ret' will pop the address of the code and jump
++	   to it.  */
++
++L(pseudo_end):
++	ret
++PSEUDO_END(__swapcontext)
++
++weak_alias (__swapcontext, swapcontext)
+diff --git a/sysdeps/mach/hurd/i386/ucontext_i.sym b/sysdeps/mach/hurd/i386/ucontext_i.sym
+new file mode 100644
+index 0000000..cc1cfd5
+--- /dev/null
++++ b/sysdeps/mach/hurd/i386/ucontext_i.sym
+@@ -0,0 +1,29 @@
++#include <stddef.h>
++#include <signal.h>
++#include <sys/ucontext.h>
++
++--
++
++SIG_BLOCK
++SIG_SETMASK
++
++#define ucontext(member)	offsetof (ucontext_t, member)
++#define mcontext(member)	ucontext (uc_mcontext.member)
++#define mreg(reg)		mcontext (gregs[REG_##reg])
++
++oLINK		ucontext (uc_link)
++oSS_SP		ucontext (uc_stack.ss_sp)
++oSS_SIZE	ucontext (uc_stack.ss_size)
++oGS		mreg (GS)
++oFS		mreg (FS)
++oEDI		mreg (EDI)
++oESI		mreg (ESI)
++oEBP		mreg (EBP)
++oESP		mreg (ESP)
++oEBX		mreg (EBX)
++oEDX		mreg (EDX)
++oECX		mreg (ECX)
++oEAX		mreg (EAX)
++oEIP		mreg (EIP)
++oFPREGS		mcontext (fpregs)
++oSIGMASK	ucontext (uc_sigmask)
+-- 
+tg: (4a7fa7e..) t/context_functions (depends on: fbeafedeea37e0af1984a6511018d159f5ceed6a)

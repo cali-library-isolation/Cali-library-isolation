@@ -1,0 +1,32 @@
+Description: Use the official name Bangla for the language spoken in Bangladesh
+Bug-Ubuntu: https://launchpad.net/bugs/991002, https://launchpad.net/bugs/1070581
+Forwarded: http://sourceware.org/bugzilla/show_bug.cgi?id=14925
+Author: Gunnar Hjalmarsson <gunnarhj@ubuntu.com>
+
+Index: langpack-locales/locales/bn_BD
+===================================================================
+--- a/localedata/locales/bn_BD	2012-03-06 09:21:51.000000000 +0100
++++ b/localedata/locales/bn_BD	2013-02-02 09:29:30.968480519 +0100
+@@ -11,7 +11,7 @@
+ email      "taneem@bengalinux.org, jamil@bengalinux.org"
+ tel        ""
+ fax        ""
+-language   "Bengali/Bangla"
++language   "Bangla"
+ territory  "Bangladesh"
+ revision   "0.5"
+ date       "2007-01-10"
+
+Index: langpack-locales/locales/bn_IN
+===================================================================
+--- a/localedata/locales/bn_IN	2012-03-06 10:10:18.000000000 +0100
++++ b/localedata/locales/bn_IN	2013-02-02 09:30:45.764851414 +0100
+@@ -13,7 +13,7 @@
+ email      "bug-glibc-locales@gnu.org"
+ tel         ""
+ fax         ""
+-language    "Bengali"
++language    "Bangla"
+ territory   "India"
+ revision    "1.0"
+ date        "2006-05-29"

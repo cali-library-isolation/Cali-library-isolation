@@ -1,0 +1,31 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+      - "libMagick*.a"
+  library:
+    selectors:
+      - "libgs.so"
+    permissions:
+      readonly:
+        #- /bin
+        #- /lib
+        #- /lib64
+        #- /sbin
+        #- /usr
+        #- /etc
+        - /dev/urandom
+        - /var/lib/ghostscript
+      readwrite:
+        - "$ARGV_FOLDERS"
+        - /tmp
+      #user: 65534 # = nobody
+      #group: 65534 # = nogroup
+      # network: all/host, local, none
+      network: none

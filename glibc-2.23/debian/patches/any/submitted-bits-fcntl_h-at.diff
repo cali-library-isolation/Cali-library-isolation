@@ -1,0 +1,128 @@
+2012-10-08  Wookey  <wookey@wookware.org>
+
+        * include AT_* defines in sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+
+2009-11-19  Aurelien Jarno  <aurelien@aurel32.net>
+    
+	* io/fcntl.h: Move AT_* defines to...
+	* sysdeps/mach/hurd/bits/fcntl.h: ...here.
+	* sysdeps/unix/sysv/linux/powerpc/bits/fcntl.h: ...here.
+	* sysdeps/unix/sysv/linux/s390/bits/fcntl.h: ...here.
+	* sysdeps/unix/sysv/linux/sh/bits/fcntl.h: ...here.
+	* sysdeps/unix/sysv/linux/sparc/bits/fcntl.h: ...here.
+	* sysdeps/unix/sysv/linux/x86/bits/fcntl.h: ...here.
+
+2009-11-19  Aurelien Jarno  <aurelien@aurel32.net>
+    
+	* sysdeps/unix/sysv/linux/alpha/bits/fcntl.h: Define AT_*
+	constants.
+	* sysdeps/unix/sysv/linux/arm/bits/fcntl.h: Define AT_*
+	constants.
+	* sysdeps/unix/sysv/linux/hppa/bits/fcntl.h: Define AT_*
+	constants.
+	* sysdeps/unix/sysv/linux/ia64/bits/fcntl.h: Define AT_*
+	constants.
+	* sysdeps/unix/sysv/linux/m68k/bits/fcntl.h: Define AT_*
+	constants.
+	* sysdeps/unix/sysv/linux/mips/bits/fcntl.h: Define AT_*
+	constants.
+
+---
+ io/fcntl.h                                       |   17 -----------------
+ sysdeps/unix/sysv/linux/alpha/bits/fcntl.h |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/arm/bits/fcntl.h   |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/hppa/bits/fcntl.h  |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/ia64/bits/fcntl.h  |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/m68k/bits/fcntl.h  |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/mips/bits/fcntl.h  |   18 ++++++++++++++++++
+ sysdeps/mach/hurd/bits/fcntl.h                   |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/powerpc/bits/fcntl.h     |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/s390/bits/fcntl.h        |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/sh/bits/fcntl.h          |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/sparc/bits/fcntl.h       |   18 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/x86/bits/fcntl.h         |   18 ++++++++++++++++++
+ 14 files changed, 236 insertions(+), 17 deletions(-)
+
+--- a/io/fcntl.h
++++ b/io/fcntl.h
+@@ -123,29 +123,6 @@
+ # define SEEK_END	2	/* Seek from end of file.  */
+ #endif	/* XPG */
+ 
+-/* The constants AT_REMOVEDIR and AT_EACCESS have the same value.  AT_EASSESS
+-   is meaningful only to faccessat, while AT_REMOVEDIR is meaningful only to
+-   unlinkat.  The two functions do completely different things and therefore,
+-   the flags can be allowed to overlap.  For example, passing AT_REMOVEDIR to
+-   faccessat would be undefined behavior and thus treating it equivalent to
+-   AT_EACCESS is valid undefined behavior.  */
+-#ifdef __USE_ATFILE
+-# define AT_FDCWD		-100	/* Special value used to indicate
+-					   the *at functions should use the
+-					   current working directory. */
+-# define AT_SYMLINK_NOFOLLOW	0x100	/* Do not follow symbolic links.  */
+-# define AT_REMOVEDIR		0x200	/* Remove directory instead of
+-					   unlinking file.  */
+-# define AT_SYMLINK_FOLLOW	0x400	/* Follow symbolic links.  */
+-# ifdef __USE_GNU
+-#  define AT_NO_AUTOMOUNT	0x800	/* Suppress terminal automount
+-					   traversal.  */
+-#  define AT_EMPTY_PATH		0x1000	/* Allow empty relative pathname.  */
+-# endif
+-# define AT_EACCESS		0x200	/* Test access permitted for
+-					   effective IDs, not real IDs.  */
+-#endif
+-
+ /* Do the file control operation described by CMD on FD.
+    The remaining arguments are interpreted depending on CMD.
+ 
+--- a/sysdeps/mach/hurd/bits/fcntl.h
++++ b/sysdeps/mach/hurd/bits/fcntl.h
+@@ -219,3 +219,21 @@
+ # define POSIX_FADV_DONTNEED	4 /* Don't need these pages.  */
+ # define POSIX_FADV_NOREUSE	5 /* Data will be accessed once.  */
+ #endif
++
++/* Values for `*at' functions.  */
++#ifdef __USE_ATFILE
++# define AT_FDCWD		-100	/* Special value used to indicate
++					   the *at functions should use the
++					   current working directory. */
++# define AT_SYMLINK_NOFOLLOW	0x100	/* Do not follow symbolic links.  */
++# define AT_REMOVEDIR		0x200	/* Remove directory instead of
++					   unlinking file.  */
++# define AT_SYMLINK_FOLLOW	0x400	/* Follow symbolic links.  */
++# ifdef __USE_GNU
++#  define AT_NO_AUTOMOUNT	0x800	/* Suppress terminal automount
++					   traversal.  */
++#  define AT_EMPTY_PATH		0x1000	/* Allow empty relative pathname.  */
++# endif
++# define AT_EACCESS		0x200	/* Test access permitted for
++					   effective IDs, not real IDs.  */
++#endif
+--- a/sysdeps/unix/sysv/linux/bits/fcntl-linux.h
++++ b/sysdeps/unix/sysv/linux/bits/fcntl-linux.h
+@@ -242,6 +242,24 @@
+ # define MAX_HANDLE_SZ	128
+ #endif
+ 
++/* Values for `*at' functions.  */
++#ifdef __USE_ATFILE
++# define AT_FDCWD		-100	/* Special value used to indicate
++					   the *at functions should use the
++					   current working directory. */
++# define AT_SYMLINK_NOFOLLOW	0x100	/* Do not follow symbolic links.  */
++# define AT_REMOVEDIR		0x200	/* Remove directory instead of
++					   unlinking file.  */
++# define AT_SYMLINK_FOLLOW	0x400	/* Follow symbolic links.  */
++# ifdef __USE_GNU
++#  define AT_NO_AUTOMOUNT	0x800	/* Suppress terminal automount
++					   traversal.  */
++#  define AT_EMPTY_PATH		0x1000	/* Allow empty relative pathname.  */
++# endif
++# define AT_EACCESS		0x200	/* Test access permitted for
++					   effective IDs, not real IDs.  */
++#endif
++
+ __BEGIN_DECLS
+ 
+ #ifdef __USE_GNU

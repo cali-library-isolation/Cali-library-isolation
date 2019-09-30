@@ -1,0 +1,29 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+linkerOverride: true
+strongFDAnalysis: true
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+      - "libxio.a"
+  library:
+    selectors:
+      - "libssl.so"
+      - "libcrypto.so"
+    permissions:
+      readonly:
+        - /dev/random
+        - /dev/urandom
+        - "$ARGV"
+      readwrite:
+        - /tmp
+      #user: 65534 # = nobody
+      #group: 65534 # = nogroup
+      # network: all/host, local, none
+      network: none
+

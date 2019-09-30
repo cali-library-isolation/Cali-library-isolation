@@ -1,0 +1,71 @@
+From: Richard Braun <rbraun@sceen.net>
+Subject: [PATCH] Hurd: fix port leak in TLS
+
+Depending on whether the thread is the main thread or not, the threading
+library can have trouble determining whether the thread reference in the
+TCB is valid. The simple solution is to let the threading library
+initialize the TCB, and use a temporary reference when initializing TLS.
+
+* sysdeps/mach/hurd/i386/tls.h (_hurd_tls_init): Use a temporary thread
+reference.
+
+---
+ sysdeps/mach/hurd/i386/tls.h | 35 +++++++++++++++++++++++------------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
+
+--- a/sysdeps/mach/hurd/i386/tls.h
++++ b/sysdeps/mach/hurd/i386/tls.h
+@@ -69,6 +69,8 @@ static inline const char * __attribute__
+ _hurd_tls_init (tcbhead_t *tcb)
+ {
+   HURD_TLS_DESC_DECL (desc, tcb);
++  thread_t self = __mach_thread_self ();
++  const char *msg = NULL;
+ 
+   /* This field is used by TLS accesses to get our "thread pointer"
+      from the TLS point of view.  */
+@@ -76,25 +78,26 @@ _hurd_tls_init (tcbhead_t *tcb, int seco
+      from the TLS point of view.  */
+   tcb->tcb = tcb;
+ 
+-  /* Cache our thread port.  */
+-  tcb->self = __mach_thread_self ();
+-
+   /* Get the first available selector.  */
+   int sel = -1;
+-  kern_return_t err = __i386_set_gdt (tcb->self, &sel, desc);
++  kern_return_t err = __i386_set_gdt (self, &sel, desc);
+   if (err == MIG_BAD_ID)
+     {
+       /* Old kernel, use a per-thread LDT.  */
+       sel = 0x27;
+-      err = __i386_set_ldt (tcb->self, sel, &desc, 1);
++      err = __i386_set_ldt (self, sel, &desc, 1);
+       assert_perror (err);
+       if (err)
+-	return "i386_set_ldt failed";
++	{
++	  msg = "i386_set_ldt failed";
++	  goto out;
++	}
+     }
+   else if (err)
+     {
+       assert_perror (err); /* Separate from above with different line #. */
+-      return "i386_set_gdt failed";
++      msg = "i386_set_gdt failed";
++      goto out;
+     }
+ 
+   /* Now install the new selector.  */
+@@ -107,7 +110,9 @@ _hurd_tls_init (tcbhead_t *tcb, int seco
+   /* Now install the new selector.  */
+   asm volatile ("mov %w0, %%gs" :: "q" (sel));
+ 
+-  return 0;
++out:
++  __mach_port_deallocate (__mach_task_self (), self);
++  return msg;
+ }
+ 
+ /* Code to initially initialize the thread pointer.  This might need

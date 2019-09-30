@@ -1,0 +1,375 @@
+commit 47916b2fb311a305ba31715c1e67462c7f2e1821
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Thu Aug 20 23:27:46 2015 +0200
+
+    Remove more unused signals implementation
+    
+    * sysdeps/generic/killpg.c: Remove file.
+    * sysdeps/generic/sigaddset.c: Likewise.
+    * sysdeps/generic/sigdelset.c: Likewise.
+    * sysdeps/generic/sigemptyset.c: Likewise.
+    * sysdeps/generic/sigfillset.c: Likewise.
+    * sysdeps/generic/siginterrupt.c: Likewise.
+    * sysdeps/generic/sigismember.c: Likewise.
+    * sysdeps/generic/signal.c: Likewise.
+    * sysdeps/generic/sigwait.c: Likewise.
+
+diff --git a/libpthread/sysdeps/generic/killpg.c b/libpthread/sysdeps/generic/killpg.c
+deleted file mode 100644
+index 7f7ed87..0000000
+--- a/libpthread/sysdeps/generic/killpg.c
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/* killpg.c - Generic killpg implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-killpg (pid_t pid, int sig)
+-{
+-  return kill (-pid, sig);
+-}
+diff --git a/libpthread/sysdeps/generic/sigaddset.c b/libpthread/sysdeps/generic/sigaddset.c
+deleted file mode 100644
+index 14edb71..0000000
+--- a/libpthread/sysdeps/generic/sigaddset.c
++++ /dev/null
+@@ -1,35 +0,0 @@
+-/* sigaddset.c - Generic sigaddset implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-sigaddset (sigset_t *sigset, int signo)
+-{
+-  if (signo <= 0 || signo >= NSIG)
+-    {
+-      errno = EINVAL;
+-      return -1;
+-    }
+-
+-  *sigset |= sigmask (signo);
+-  return 0;
+-}
+-
+diff --git a/libpthread/sysdeps/generic/sigdelset.c b/libpthread/sysdeps/generic/sigdelset.c
+deleted file mode 100644
+index 5456467..0000000
+--- a/libpthread/sysdeps/generic/sigdelset.c
++++ /dev/null
+@@ -1,35 +0,0 @@
+-/* sigdelset.c - Generic sigdelset implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-sigdelset (sigset_t *sigset, int signo)
+-{
+-  if (signo <= 0 || signo >= NSIG)
+-    {
+-      errno = EINVAL;
+-      return -1;
+-    }
+-
+-  *sigset &= ~sigmask (signo);
+-  return 0;
+-}
+-
+diff --git a/libpthread/sysdeps/generic/sigemptyset.c b/libpthread/sysdeps/generic/sigemptyset.c
+deleted file mode 100644
+index 690c15b..0000000
+--- a/libpthread/sysdeps/generic/sigemptyset.c
++++ /dev/null
+@@ -1,29 +0,0 @@
+-/* sigemptyset.c - Generic sigemptyset implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include <signal.h>
+-
+-int
+-sigemptyset (sigset_t *sigset)
+-{
+-  *sigset = 0;
+-  return 0;
+-}
+-
+diff --git a/libpthread/sysdeps/generic/sigfillset.c b/libpthread/sysdeps/generic/sigfillset.c
+deleted file mode 100644
+index f0ac078..0000000
+--- a/libpthread/sysdeps/generic/sigfillset.c
++++ /dev/null
+@@ -1,29 +0,0 @@
+-/* sigfillset.c - Generic sigfillset implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include <signal.h>
+-
+-int
+-sigfillset (sigset_t *sigset)
+-{
+-  *sigset = (1ULL << (NSIG - 1)) - 1;
+-  return 0;
+-}
+-
+diff --git a/libpthread/sysdeps/generic/siginterrupt.c b/libpthread/sysdeps/generic/siginterrupt.c
+deleted file mode 100644
+index 0899efb..0000000
+--- a/libpthread/sysdeps/generic/siginterrupt.c
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/* siginterrupt.c - Generic siginterrupt implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-siginterrupt (int sig, int flag)
+-{
+-  int ret;
+-  struct sigaction act;
+-
+-  sigaction (sig, NULL, &act);
+-  if (flag)
+-    act.sa_flags &= ~SA_RESTART;
+-  else
+-    act.sa_flags |= SA_RESTART;
+-  ret = sigaction(sig, &act, NULL);
+-  return ret;
+-}
+diff --git a/libpthread/sysdeps/generic/sigismember.c b/libpthread/sysdeps/generic/sigismember.c
+deleted file mode 100644
+index b3d65c9..0000000
+--- a/libpthread/sysdeps/generic/sigismember.c
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/* sigismember.c - Generic sigismember implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-sigismember (const sigset_t *sigset, int signo)
+-{
+-  if (signo <= 0 || signo >= NSIG)
+-    {
+-      errno = EINVAL;
+-      return -1;
+-    }
+-
+-  if (*sigset & sigmask (signo))
+-    return 1;
+-  else
+-    return 0;
+-}
+diff --git a/libpthread/sysdeps/generic/signal.c b/libpthread/sysdeps/generic/signal.c
+deleted file mode 100644
+index 7555d0a..0000000
+--- a/libpthread/sysdeps/generic/signal.c
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/* signal.c - Generic signal implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-void (*signal (int sig, void (*handler)(int)))(int)
+-{
+-  struct sigaction sa;
+-
+-  sa.sa_handler = handler;
+-  sa.sa_flags = SA_RESTART;
+-
+-  if (sigemptyset (&sa.sa_mask) < 0
+-      || sigaddset (&sa.sa_mask, sig) < 0)
+-    return SIG_ERR;
+-
+-  struct sigaction osa;
+-  if (sigaction (sig, &sa, &osa) < 0)
+-    return SIG_ERR;
+-
+-  return osa.sa_handler;
+-}
+-
+-void (*bsd_signal (int sig, void (*func)(int)))(int)
+-{
+-  return signal (sig, func);
+-}
+diff --git a/libpthread/sysdeps/generic/sigwait.c b/libpthread/sysdeps/generic/sigwait.c
+deleted file mode 100644
+index 7d10bf8..0000000
+--- a/libpthread/sysdeps/generic/sigwait.c
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/* sigwait.c - Generic sigwait implementation.
+-   Copyright (C) 2008 Free Software Foundation, Inc.
+-   Written by Neal H. Walfield <neal@gnu.org>.
+-
+-   This file is part of the GNU Hurd.
+-
+-   The GNU Hurd is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public License
+-   as published by the Free Software Foundation; either version 3 of
+-   the License, or (at your option) any later version.
+-
+-   The GNU Hurd is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this program.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-#include "sig-internal.h"
+-
+-int
+-sigwait (const sigset_t *restrict set, int *restrict signo)
+-{
+-  siginfo_t info;
+-
+-  if (sigwaitinfo (set, &info) < 0)
+-    return -1;
+-
+-  *signo = info.si_signo;
+-  return 0;
+-}
+-

@@ -1,0 +1,37 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+addLibstdc++: true
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+      - "*.bc"
+      - "libengine.a"
+      - "libfilezilla.a"
+      - "libpugixml.a"
+      - "libfzdbus.a"
+      - "libstdc++.a"
+  library:
+    selectors:
+      - "libsqlite3.so"
+    permissions:
+      readonly:
+        #  - /
+        #- /bin
+        #- /lib
+        #- /lib64
+        #- /sbin
+        #- /usr
+        #- /etc
+        #- /dev/urandom
+      readwrite:
+        #- "/"
+        - "$HOME/.config/filezilla"
+      #user: 65534 # = nobody
+      #group: 65534 # = nogroup
+      # network: all/host, local, none
+      network: none

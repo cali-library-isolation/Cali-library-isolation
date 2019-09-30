@@ -1,0 +1,995 @@
+The alpha assembly version of various string functions do not work 
+correctly on some corner cases, and thus doesn't pass the testsuite.
+This patch removes them.
+
+---
+ sysdeps/alpha/alphaev67/stpncpy.S |  115 -------------
+ sysdeps/alpha/alphaev67/strncat.S |   87 ----------
+ sysdeps/alpha/stpncpy.S           |  106 ------------
+ sysdeps/alpha/strcmp.S            |  194 ----------------------
+ sysdeps/alpha/strncat.S           |   94 ----------
+ sysdeps/alpha/strncmp.S           |  277 --------------------------------
+ sysdeps/alpha/strncpy.S           |   87 ----------
+ 7 files changed, 960 deletions(-)
+
+--- a/sysdeps/alpha/strncat.S
++++ /dev/null
+@@ -1,94 +0,0 @@
+-/* Copyright (C) 1996-2016 Free Software Foundation, Inc.
+-   This file is part of the GNU C Library.
+-   Contributed by Richard Henderson <rth@tamu.edu>, 1996.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Append no more than COUNT characters from the null-terminated string SRC
+-   to the null-terminated string DST.  Always null-terminate the new DST.  */
+-
+-#include <sysdep.h>
+-
+-	.text
+-
+-ENTRY(strncat)
+-	ldgp	gp, 0(pv)
+-#ifdef PROF
+-	.set noat
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-	.set at
+-#endif
+-	.prologue 1
+-
+-	mov	a0, v0		# set up return value
+-	beq	a2, $zerocount
+-
+-	/* Find the end of the string.  */
+-
+-	ldq_u   t0, 0(a0)	# load first quadword (a0 may be misaligned)
+-	lda     t1, -1(zero)
+-	insqh   t1, a0, t1
+-	andnot  a0, 7, a0
+-	or      t1, t0, t0
+-	cmpbge  zero, t0, t1	# t1 <- bitmask: bit i == 1 <==> i-th byte == 0
+-	bne     t1, $found
+-
+-$loop:	ldq     t0, 8(a0)
+-	addq    a0, 8, a0	# addr += 8
+-	cmpbge  zero, t0, t1
+-	beq     t1, $loop
+-
+-$found:	negq    t1, t2		# clear all but least set bit
+-	and     t1, t2, t1
+-
+-	and     t1, 0xf0, t2	# binary search for that set bit
+-	and	t1, 0xcc, t3
+-	and	t1, 0xaa, t4
+-	cmovne	t2, 4, t2
+-	cmovne	t3, 2, t3
+-	cmovne	t4, 1, t4
+-	addq	t2, t3, t2
+-	addq	a0, t4, a0
+-	addq	a0, t2, a0
+-
+-	/* Now do the append.  */
+-
+-	jsr	t9, __stxncpy
+-
+-	/* Worry about the null termination.  */
+-
+-	zapnot	t0, t8, t1	# was last byte a null?
+-	bne	t1, 0f
+-	ret
+-
+-0:	and	t10, 0x80, t1
+-	bne	t1, 1f
+-
+-	/* Here there are bytes left in the current word.  Clear one.  */
+-	addq	t10, t10, t10	# end-of-count bit <<= 1
+-	zap	t0, t10, t0
+-	stq_u	t0, 0(a0)
+-	ret
+-
+-1:	/* Here we must read the next DST word and clear the first byte.  */
+-	ldq_u	t0, 8(a0)
+-	zap	t0, 1, t0
+-	stq_u	t0, 8(a0)
+-
+-$zerocount:
+-	ret
+-
+-	END(strncat)
+--- a/sysdeps/alpha/strncpy.S
++++ /dev/null
+@@ -1,87 +0,0 @@
+-/* Copyright (C) 1996-2016 Free Software Foundation, Inc.
+-   Contributed by Richard Henderson (rth@tamu.edu)
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Copy no more than COUNT bytes of the null-terminated string from
+-   SRC to DST.  If SRC does not cover all of COUNT, the balance is
+-   zeroed.  */
+-
+-#include <sysdep.h>
+-
+-	.set noat
+-	.set noreorder
+-
+-	.text
+-
+-ENTRY(strncpy)
+-	ldgp	gp, 0(pv)
+-#ifdef PROF
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-#endif
+-	.prologue 1
+-
+-	mov	a0, v0		# set return value now
+-	beq	a2, $zerocount
+-	jsr	t9, __stxncpy	# do the work of the copy
+-
+-	bne	a2, $multiword	# do we have full words left?
+-
+-	.align 3
+-	subq	t8, 1, t2	# e0    : guess not
+-	subq	t10, 1, t3	# .. e1 :
+-	or	t2, t8, t2	# e0    : clear the bits between the last
+-	or	t3, t10, t3	# .. e1 : written byte and the last byte in
+-	andnot	t3, t2, t3	# e0    : COUNT
+-	zap	t0, t3, t0	# e1    :
+-	stq_u	t0, 0(a0)	# e0    :
+-	ret			# .. e1 :
+-
+-$multiword:
+-	subq	t8, 1, t7	# e0    : clear the final bits in the prev
+-	or	t7, t8, t7	# e1    : word
+-	zapnot	t0, t7, t0	# e0    :
+-	subq	a2, 1, a2	# .. e1 :
+-	stq_u	t0, 0(a0)	# e0    :
+-	addq	a0, 8, a0	# .. e1 :
+-
+-	beq	a2, 1f		# e1    :
+-	blbc	a2, 0f		# e1    :
+-
+-	stq_u	zero, 0(a0)	# e0    : zero one word
+-	subq	a2, 1, a2	# .. e1 :
+-	addq	a0, 8, a0	# e0    :
+-	beq	a2, 1f		# .. e1 :
+-
+-0:	stq_u	zero, 0(a0)	# e0    : zero two words
+-	subq	a2, 2, a2	# .. e1 :
+-	stq_u	zero, 8(a0)	# e0    :
+-	addq	a0, 16, a0	# .. e1 :
+-	bne	a2, 0b		# e1    :
+-	unop
+-
+-1:	ldq_u	t0, 0(a0)	# e0    : clear the leading bits in the final
+-	subq	t10, 1, t7	# .. e1 : word
+-	or	t7, t10, t7	# e0    :
+-	zap	t0, t7, t0	# e1 (stall)
+-	stq_u	t0, 0(a0)	# e0    :
+-
+-$zerocount:
+-	ret			# .. e1 :
+-
+-	END(strncpy)
+-libc_hidden_builtin_def (strncpy)
+--- a/sysdeps/alpha/alphaev67/strncat.S
++++ /dev/null
+@@ -1,87 +0,0 @@
+-/* Copyright (C) 2000-2016 Free Software Foundation, Inc.
+-   Contributed by Richard Henderson <rth@tamu.edu>, 1996.
+-   EV67 optimized by Rick Gorton <rick.gorton@alpha-processor.com>.
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Append no more than COUNT characters from the null-terminated string SRC
+-   to the null-terminated string DST.  Always null-terminate the new DST.  */
+-
+-#include <sysdep.h>
+-
+-	.arch ev6
+-	.set noreorder
+-	.text
+-
+-ENTRY(strncat)
+-	ldgp	gp, 0(pv)
+-#ifdef PROF
+-	.set noat
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-	.set at
+-#endif
+-	.prologue 1
+-
+-	mov	a0, v0		# set up return value
+-	beq	a2, $zerocount	# U :
+-	/* Find the end of the string.  */
+-	ldq_u   t0, 0(a0)	# L : load first quadword (a0 may be misaligned)
+-	lda     t1, -1		# E :
+-
+-	insqh   t1, v0, t1	# U :
+-	andnot  a0, 7, a0	# E :
+-	nop			# E :
+-	or      t1, t0, t0	# E :
+-
+-	nop			# E :
+-	nop			# E :
+-	cmpbge  zero, t0, t1	# E : bits set iff byte == 0
+-	bne     t1, $found	# U :
+-
+-$loop:	ldq     t0, 8(a0)	# L :
+-	addq    a0, 8, a0	# E :
+-	cmpbge  zero, t0, t1	# E :
+-	beq     t1, $loop	# U :
+-
+-$found:	cttz	t1, t2		# U0 :
+-	addq	a0, t2, a0	# E :
+-	jsr	t9, __stxncpy	# L0 : Now do the append.
+-
+-	/* Worry about the null termination.  */
+-
+-	cttz	t10, t2		# U0: byte offset of end-of-count.
+-	bic	a0, 7, a0	# E : word align the last write address.
+-	zapnot	t0, t8, t1	# U : was last byte a null?
+-	nop			# E :
+-
+-	bne	t1, 0f		# U :
+-	nop			# E :
+-	nop			# E :
+-	ret			# L0 :
+-
+-0:	addq	t2, a0, a0	# E : address of end-of-count
+-	stb	zero, 1(a0)	# L :
+-	nop			# E :
+-	ret			# L0 :
+-
+-$zerocount:
+-	nop			# E :
+-	nop			# E :
+-	nop			# E :
+-	ret			# L0 :
+-
+-	END(strncat)
+--- a/sysdeps/alpha/stpncpy.S
++++ /dev/null
+@@ -1,106 +0,0 @@
+-/* Copyright (C) 1996-2016 Free Software Foundation, Inc.
+-   This file is part of the GNU C Library.
+-   Contributed by Richard Henderson (rth@tamu.edu)
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Copy no more than COUNT bytes of the null-terminated string from
+-   SRC to DST.  If SRC does not cover all of COUNT, the balance is
+-   zeroed.  Return the address of the terminating null in DEST, if
+-   any, else DEST + COUNT.  */
+-
+-#include <sysdep.h>
+-
+-	.set noat
+-	.set noreorder
+-
+-	.text
+-
+-ENTRY(__stpncpy)
+-	ldgp	gp, 0(pv)
+-#ifdef PROF
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-#endif
+-	.prologue 1
+-
+-	beq	a2, $zerocount
+-	jsr	t9, __stxncpy	# do the work of the copy
+-
+-	and	t8, 0xf0, t3	# binary search for byte offset of the
+-	and	t8, 0xcc, t2	# last byte written.
+-	and	t8, 0xaa, t1
+-	andnot	a0, 7, v0
+-	cmovne	t3, 4, t3
+-	cmovne	t2, 2, t2
+-	cmovne	t1, 1, t1
+-	addq	v0, t3, v0
+-	addq	t1, t2, t1
+-	addq	v0, t1, v0
+-
+-	bne	a2, $multiword	# do we have full words left?
+-
+-	.align 3
+-	zapnot	t0, t8, t4	# e0    : was last byte a null?
+-	subq	t8, 1, t2	# .. e1 :
+-	addq	v0, 1, t5	# e0    :
+-	subq	t10, 1, t3	# .. e1 :
+-	or	t2, t8, t2	# e0    : clear the bits between the last
+-	or	t3, t10, t3	# .. e1 : written byte and the last byte in
+-	andnot	t3, t2, t3	# e0    : COUNT
+-	cmovne	t4, t5, v0	# .. e1 : if last written wasnt null, inc v0
+-	zap	t0, t3, t0	# e0    :
+-	stq_u	t0, 0(a0)	# e1    :
+-	ret			# .. e1 :
+-
+-	.align 3
+-$multiword:
+-	subq	t8, 1, t7	# e0    : clear the final bits in the prev
+-	or	t7, t8, t7	# e1    : word
+-	zapnot	t0, t7, t0	# e0    :
+-	subq	a2, 1, a2	# .. e1 :
+-	stq_u	t0, 0(a0)	# e0    :
+-	addq	a0, 8, a0	# .. e1 :
+-
+-	beq	a2, 1f		# e1    :
+-	blbc	a2, 0f		# e1    :
+-
+-	stq_u	zero, 0(a0)	# e0    : zero one word
+-	subq	a2, 1, a2	# .. e1 :
+-	addq	a0, 8, a0	# e0    :
+-	beq	a2, 1f		# .. e1 :
+-
+-0:	stq_u	zero, 0(a0)	# e0    : zero two words
+-	subq	a2, 2, a2	# .. e1 :
+-	stq_u	zero, 8(a0)	# e0    :
+-	addq	a0, 16, a0	# .. e1 :
+-	bne	a2, 0b		# e1    :
+-	unop
+-
+-1:	ldq_u	t0, 0(a0)	# e0    : clear the leading bits in the final
+-	subq	t10, 1, t7	# .. e1 : word
+-	or	t7, t10, t7	# e0    :
+-	zap	t0, t7, t0	# e1 (stall)
+-	stq_u	t0, 0(a0)	# e0    :
+-	ret			# .. e1 :
+-
+-$zerocount:
+-	mov	a0, v0
+-	ret
+-
+-	END(__stpncpy)
+-
+-libc_hidden_def (__stpncpy)
+-weak_alias (__stpncpy, stpncpy)
+--- a/sysdeps/alpha/alphaev67/stpncpy.S
++++ /dev/null
+@@ -1,115 +0,0 @@
+-/* Copyright (C) 2000-2016 Free Software Foundation, Inc.
+-   Contributed by Richard Henderson (rth@redhat.com)
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Copy no more than N bytes from SRC to DEST, returning the address of
+-   the terminating '\0' in DEST.  */
+-
+-#include <sysdep.h>
+-
+-	.arch ev6
+-	.set noat
+-	.set noreorder
+-	.text
+-
+-ENTRY(__stpncpy)
+-	ldgp	gp, 0(pv)
+-#ifdef PROF
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-#endif
+-	.prologue 1
+-
+-	mov	a0, v0
+-	beq	a2, $zerocount
+-
+-	.align 4
+-	nop
+-	nop
+-	jsr	t9, __stxncpy	# do the work of the copy
+-
+-	cttz	t8, t4
+-	zapnot	t0, t8, t5
+-	andnot	a0, 7, a0
+-	bne	a2, $multiword	# do we have full words left?
+-
+-	subq	t8, 1, t2
+-	subq	t10, 1, t3
+-	cmpult	zero, t5, t5
+-	addq	a0, t4, v0
+-
+-	or	t2, t8, t2
+-	or	t3, t10, t3
+-	addq	v0, t5, v0
+-	andnot	t3, t2, t3
+-
+-	zap	t0, t3, t0
+-	nop
+-	stq	t0, 0(a0)
+-	ret
+-
+-$multiword:
+-	subq	t8, 1, t7	# clear the final bits in the prev word
+-	cmpult	zero, t5, t5
+-	or	t7, t8, t7
+-	zapnot	t0, t7, t0
+-
+-	subq	a2, 1, a2
+-	stq	t0, 0(a0)
+-	addq	a0, 8, a1
+-	beq	a2, 1f		# loop over full words remaining
+-
+-	nop
+-	nop
+-	nop
+-	blbc	a2, 0f
+-
+-	stq	zero, 0(a1)
+-	subq	a2, 1, a2
+-	addq	a1, 8, a1
+-	beq	a2, 1f
+-
+-0:	stq	zero, 0(a1)
+-	subq	a2, 2, a2
+-	nop
+-	nop
+-
+-	stq	zero, 8(a1)
+-	addq	a1, 16, a1
+-	nop
+-	bne	a2, 0b
+-
+-1:	ldq	t0, 0(a1)	# clear the leading bits in the final word
+-	subq	t10, 1, t7
+-	addq	a0, t4, v0
+-	nop
+-
+-	or	t7, t10, t7
+-	addq	v0, t5, v0
+-	zap	t0, t7, t0
+-	stq	t0, 0(a1)
+-
+-$zerocount:
+-	nop
+-	nop
+-	nop
+-	ret
+-
+-	END(__stpncpy)
+-
+-libc_hidden_def (__stpncpy)
+-weak_alias (__stpncpy, stpncpy)
+--- a/sysdeps/alpha/strcmp.S
++++ /dev/null
+@@ -1,194 +0,0 @@
+-/* Copyright (C) 1996-2016 Free Software Foundation, Inc.
+-   Contributed by Richard Henderson (rth@tamu.edu)
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Bytewise compare two null-terminated strings.  */
+-
+-#include <sysdep.h>
+-
+-	.set noat
+-	.set noreorder
+-
+-	.text
+-
+-ENTRY(strcmp)
+-#ifdef PROF
+-	ldgp	gp, 0(pv)
+-	lda	AT, _mcount
+-	jmp	AT, (AT), _mcount
+-	.prologue 1
+-#else
+-	.prologue 0
+-#endif
+-
+-	ldq_u	t0, 0(a0)	# e0    : give cache time to catch up
+-	xor	a0, a1, t2	# .. e1 : are s1 and s2 co-aligned?
+-	ldq_u	t1, 0(a1)	# e0    :
+-	and	t2, 7, t2	# .. e1 :
+-	lda	t3, -1		# e0    :
+-	bne	t2, $unaligned	# .. e1 :
+-
+-	/* On entry to this basic block:
+-	   t0 == the first destination word for masking back in
+-	   t1 == the first source word.
+-	   t3 == -1.  */
+-
+-$aligned:
+-	mskqh	t3, a0, t3	# e0    :
+-	nop			# .. e1 :
+-	ornot	t1, t3, t1	# e0    :
+-	ornot	t0, t3, t0	# .. e1 :
+-	cmpbge	zero, t1, t7	# e0    : bits set iff null found
+-	bne	t7, $eos	# e1 (zdb)
+-
+-	/* Aligned compare main loop.
+-	   On entry to this basic block:
+-	   t0 == an s1 word.
+-	   t1 == an s2 word not containing a null.  */
+-
+-$a_loop:
+-	xor	t0, t1, t2	# e0	:
+-	bne	t2, $wordcmp	# .. e1 (zdb)
+-	ldq_u	t1, 8(a1)	# e0    :
+-	ldq_u	t0, 8(a0)	# .. e1 :
+-	addq	a1, 8, a1	# e0    :
+-	addq	a0, 8, a0	# .. e1 :
+-	cmpbge	zero, t1, t7	# e0    :
+-	beq	t7, $a_loop	# .. e1 (zdb)
+-	br	$eos		# e1    :
+-
+-	/* The two strings are not co-aligned.  Align s1 and cope.  */
+-
+-$unaligned:
+-	and	a0, 7, t4	# e0    : find s1 misalignment
+-	and	a1, 7, t5	# .. e1 : find s2 misalignment
+-	subq	a1, t4, a1	# e0    :
+-
+-	/* If s2 misalignment is larger than s2 misalignment, we need
+-	   extra startup checks to avoid SEGV.  */
+-
+-	cmplt	t4, t5, t8	# .. e1 :
+-	beq	t8, $u_head	# e1    :
+-
+-	mskqh	t3, t5, t3	# e0    :
+-	ornot	t1, t3, t3	# e0    :
+-	cmpbge	zero, t3, t7	# e1    : is there a zero?
+-	beq	t7, $u_head	# e1    :
+-
+-	/* We've found a zero in the first partial word of s2.  Align
+-	   our current s1 and s2 words and compare what we've got.  */
+-
+-	extql	t1, t5, t1	# e0    :
+-	extql	t0, a0, t0	# e0    :
+-	cmpbge	zero, t1, t7	# .. e1 : find that zero again
+-	br	$eos		# e1    : and finish up
+-
+-	.align 3
+-$u_head:
+-	/* We know just enough now to be able to assemble the first
+-	   full word of s2.  We can still find a zero at the end of it.
+-
+-	   On entry to this basic block:
+-	   t0 == first word of s1
+-	   t1 == first partial word of s2.  */
+-
+-	ldq_u	t2, 8(a1)	# e0    : load second partial s2 word
+-	lda	t3, -1		# .. e1 : create leading garbage mask
+-	extql	t1, a1, t1	# e0    : create first s2 word
+-	mskqh	t3, a0, t3	# e0    :
+-	extqh	t2, a1, t4	# e0    :
+-	ornot	t0, t3, t0	# .. e1 : kill s1 garbage
+-	or	t1, t4, t1	# e0    : s2 word now complete
+-	cmpbge	zero, t0, t7	# .. e1 : find zero in first s1 word
+-	ornot	t1, t3, t1	# e0    : kill s2 garbage
+-	lda	t3, -1		# .. e1 :
+-	mskql	t3, a1, t3	# e0    : mask for s2[1] bits we have seen
+-	bne	t7, $eos	# .. e1 :
+-	xor	t0, t1, t4	# e0    : compare aligned words
+-	bne	t4, $wordcmp	# .. e1 (zdb)
+-	or	t2, t3, t3	# e0    :
+-	cmpbge	zero, t3, t7	# e1    :
+-	bne	t7, $u_final	# e1    :
+-
+-	/* Unaligned copy main loop.  In order to avoid reading too much,
+-	   the loop is structured to detect zeros in aligned words from s2.
+-	   This has, unfortunately, effectively pulled half of a loop
+-	   iteration out into the head and half into the tail, but it does
+-	   prevent nastiness from accumulating in the very thing we want
+-	   to run as fast as possible.
+-
+-	   On entry to this basic block:
+-	   t2 == the unshifted low-bits from the next s2 word.  */
+-
+-	.align 3
+-$u_loop:
+-	extql	t2, a1, t3	# e0    :
+-	ldq_u	t2, 16(a1)	# .. e1 : load next s2 high bits
+-	ldq_u	t0, 8(a0)	# e0    : load next s1 word
+-	addq	a1, 8, a1	# .. e1 :
+-	addq	a0, 8, a0	# e0    :
+-	nop			# .. e1 :
+-	extqh	t2, a1, t1	# e0    :
+-	cmpbge	zero, t0, t7	# .. e1 : find zero in current s1 word
+-	or	t1, t3, t1	# e0    :
+-	bne	t7, $eos	# .. e1 :
+-	xor	t0, t1, t4	# e0    : compare the words
+-	bne	t4, $wordcmp	# .. e1 (zdb)
+-	cmpbge	zero, t2, t4	# e0    : find zero in next low bits
+-	beq	t4, $u_loop	# .. e1 (zdb)
+-
+-	/* We've found a zero in the low bits of the last s2 word.  Get
+-	   the next s1 word and align them.  */
+-$u_final:
+-	ldq_u	t0, 8(a0)	# e1    :
+-	extql	t2, a1, t1	# .. e0 :
+-	cmpbge	zero, t1, t7	# e0    :
+-
+-	/* We've found a zero somewhere in a word we just read.
+-	   On entry to this basic block:
+-	   t0 == s1 word
+-	   t1 == s2 word
+-	   t7 == cmpbge mask containing the zero.  */
+-
+-	.align 3
+-$eos:
+-	negq	t7, t6		# e0    : create bytemask of valid data
+-	and	t6, t7, t8	# e1    :
+-	subq	t8, 1, t6	# e0    :
+-	or	t6, t8, t7	# e1    :
+-	zapnot	t0, t7, t0	# e0    : kill the garbage
+-	zapnot	t1, t7, t1	# .. e1 :
+-	xor	t0, t1, v0	# e0    : and compare
+-	beq	v0, $done	# .. e1 :
+-
+-	/* Here we have two differing co-aligned words in t0 & t1.
+-	   Bytewise compare them and return (t0 > t1 ? 1 : -1).  */
+-$wordcmp:
+-	cmpbge	t0, t1, t2	# e0    : comparison yields bit mask of ge
+-	cmpbge	t1, t0, t3	# .. e1 :
+-	xor	t2, t3, t0	# e0    : bits set iff t0/t1 bytes differ
+-	negq	t0, t1		# e1    : clear all but least bit
+-	and	t0, t1, t0	# e0    :
+-	lda	v0, -1		# .. e1 :
+-	and	t0, t2, t1	# e0    : was bit set in t0 > t1?
+-	cmovne	t1, 1, v0	# .. e1 (zdb)
+-
+-$done:
+-	ret			# e1    :
+-
+-	END(strcmp)
+-libc_hidden_builtin_def (strcmp)
+--- a/sysdeps/alpha/strncmp.S
++++ /dev/null
+@@ -1,277 +0,0 @@
+-/* Copyright (C) 1996-2016 Free Software Foundation, Inc.
+-   Contributed by Richard Henderson (rth@tamu.edu)
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <http://www.gnu.org/licenses/>.  */
+-
+-/* Bytewise compare two null-terminated strings of length no longer than N.  */
+-
+-#include <sysdep.h>
+-
+-	.set noat
+-	.set noreorder
+-
+-/* EV6 only predicts one branch per octaword.  We'll use these to push
+-   subsequent branches back to the next bundle.  This will generally add
+-   a fetch+decode cycle to older machines, so skip in that case.  */
+-#ifdef __alpha_fix__
+-# define ev6_unop	unop
+-#else
+-# define ev6_unop
+-#endif
+-
+-	.text
+-
+-ENTRY(strncmp)
+-#ifdef PROF
+-	ldgp	gp, 0(pv)
+-	lda	AT, _mcount
+-	jsr	AT, (AT), _mcount
+-	.prologue 1
+-#else
+-	.prologue 0
+-#endif
+-
+-	xor	a0, a1, t2	# are s1 and s2 co-aligned?
+-	beq	a2, $zerolength
+-	ldq_u	t0, 0(a0)	# load asap to give cache time to catch up
+-	ldq_u	t1, 0(a1)
+-	lda	t3, -1
+-	and	t2, 7, t2
+-	srl	t3, 1, t6
+-	and	a0, 7, t4	# find s1 misalignment
+-	and	a1, 7, t5	# find s2 misalignment
+-	cmovlt	a2, t6, a2	# bound neg count to LONG_MAX
+-	addq	a1, a2, a3	# s2+count
+-	addq	a2, t4, a2	# bias count by s1 misalignment
+-	and	a2, 7, t10	# ofs of last byte in s1 last word
+-	srl	a2, 3, a2	# remaining full words in s1 count
+-	bne	t2, $unaligned
+-
+-	/* On entry to this basic block:
+-	   t0 == the first word of s1.
+-	   t1 == the first word of s2.
+-	   t3 == -1.  */
+-$aligned:
+-	mskqh	t3, a1, t8	# mask off leading garbage
+-	ornot	t1, t8, t1
+-	ornot	t0, t8, t0
+-	cmpbge	zero, t1, t7	# bits set iff null found
+-	beq	a2, $eoc	# check end of count
+-	bne	t7, $eos
+-	beq	t10, $ant_loop
+-
+-	/* Aligned compare main loop.
+-	   On entry to this basic block:
+-	   t0 == an s1 word.
+-	   t1 == an s2 word not containing a null.  */
+-
+-	.align 4
+-$a_loop:
+-	xor	t0, t1, t2	# e0	:
+-	bne	t2, $wordcmp	# .. e1 (zdb)
+-	ldq_u	t1, 8(a1)	# e0    :
+-	ldq_u	t0, 8(a0)	# .. e1 :
+-
+-	subq	a2, 1, a2	# e0    :
+-	addq	a1, 8, a1	# .. e1 :
+-	addq	a0, 8, a0	# e0    :
+-	beq	a2, $eoc	# .. e1 :
+-
+-	cmpbge	zero, t1, t7	# e0    :
+-	beq	t7, $a_loop	# .. e1 :
+-
+-	br	$eos
+-
+-	/* Alternate aligned compare loop, for when there's no trailing
+-	   bytes on the count.  We have to avoid reading too much data.  */
+-	.align 4
+-$ant_loop:
+-	xor	t0, t1, t2	# e0	:
+-	ev6_unop
+-	ev6_unop
+-	bne	t2, $wordcmp	# .. e1 (zdb)
+-
+-	subq	a2, 1, a2	# e0    :
+-	beq	a2, $zerolength	# .. e1 :
+-	ldq_u	t1, 8(a1)	# e0    :
+-	ldq_u	t0, 8(a0)	# .. e1 :
+-
+-	addq	a1, 8, a1	# e0    :
+-	addq	a0, 8, a0	# .. e1 :
+-	cmpbge	zero, t1, t7	# e0    :
+-	beq	t7, $ant_loop	# .. e1 :
+-
+-	br	$eos
+-
+-	/* The two strings are not co-aligned.  Align s1 and cope.  */
+-	/* On entry to this basic block:
+-	   t0 == the first word of s1.
+-	   t1 == the first word of s2.
+-	   t3 == -1.
+-	   t4 == misalignment of s1.
+-	   t5 == misalignment of s2.
+-	  t10 == misalignment of s1 end.  */
+-	.align	4
+-$unaligned:
+-	/* If s1 misalignment is larger than s2 misalignment, we need
+-	   extra startup checks to avoid SEGV.  */
+-	subq	a1, t4, a1	# adjust s2 for s1 misalignment
+-	cmpult	t4, t5, t9
+-	subq	a3, 1, a3	# last byte of s2
+-	bic	a1, 7, t8
+-	mskqh	t3, t5, t7	# mask garbage in s2
+-	subq	a3, t8, a3
+-	ornot	t1, t7, t7
+-	srl	a3, 3, a3	# remaining full words in s2 count
+-	beq	t9, $u_head
+-
+-	/* Failing that, we need to look for both eos and eoc within the
+-	   first word of s2.  If we find either, we can continue by
+-	   pretending that the next word of s2 is all zeros.  */
+-	lda	t2, 0		# next = zero
+-	cmpeq	a3, 0, t8	# eoc in the first word of s2?
+-	cmpbge	zero, t7, t7	# eos in the first word of s2?
+-	or	t7, t8, t8
+-	bne	t8, $u_head_nl
+-
+-	/* We know just enough now to be able to assemble the first
+-	   full word of s2.  We can still find a zero at the end of it.
+-
+-	   On entry to this basic block:
+-	   t0 == first word of s1
+-	   t1 == first partial word of s2.
+-	   t3 == -1.
+-	   t10 == ofs of last byte in s1 last word.
+-	   t11 == ofs of last byte in s2 last word.  */
+-$u_head:
+-	ldq_u	t2, 8(a1)	# load second partial s2 word
+-	subq	a3, 1, a3
+-$u_head_nl:
+-	extql	t1, a1, t1	# create first s2 word
+-	mskqh	t3, a0, t8
+-	extqh	t2, a1, t4
+-	ornot	t0, t8, t0	# kill s1 garbage
+-	or	t1, t4, t1	# s2 word now complete
+-	cmpbge	zero, t0, t7	# find eos in first s1 word
+-	ornot	t1, t8, t1	# kill s2 garbage
+-	beq	a2, $eoc
+-	subq	a2, 1, a2
+-	bne	t7, $eos
+-	mskql	t3, a1, t8	# mask out s2[1] bits we have seen
+-	xor	t0, t1, t4	# compare aligned words
+-	or	t2, t8, t8
+-	bne	t4, $wordcmp
+-	cmpbge	zero, t8, t7	# eos in high bits of s2[1]?
+-	cmpeq	a3, 0, t8	# eoc in s2[1]?
+-	or	t7, t8, t7
+-	bne	t7, $u_final
+-
+-	/* Unaligned copy main loop.  In order to avoid reading too much,
+-	   the loop is structured to detect zeros in aligned words from s2.
+-	   This has, unfortunately, effectively pulled half of a loop
+-	   iteration out into the head and half into the tail, but it does
+-	   prevent nastiness from accumulating in the very thing we want
+-	   to run as fast as possible.
+-
+-	   On entry to this basic block:
+-	   t2 == the unshifted low-bits from the next s2 word.
+-	   t10 == ofs of last byte in s1 last word.
+-	   t11 == ofs of last byte in s2 last word.  */
+-	.align 4
+-$u_loop:
+-	extql	t2, a1, t3	# e0    :
+-	ldq_u	t2, 16(a1)	# .. e1 : load next s2 high bits
+-	ldq_u	t0, 8(a0)	# e0    : load next s1 word
+-	addq	a1, 8, a1	# .. e1 :
+-
+-	addq	a0, 8, a0	# e0    :
+-	subq	a3, 1, a3	# .. e1 :
+-	extqh	t2, a1, t1	# e0    :
+-	cmpbge	zero, t0, t7	# .. e1 : eos in current s1 word
+-
+-	or	t1, t3, t1	# e0    :
+-	beq	a2, $eoc	# .. e1 : eoc in current s1 word
+-	subq	a2, 1, a2	# e0    :
+-	cmpbge	zero, t2, t4	# .. e1 : eos in s2[1]
+-
+-	xor	t0, t1, t3	# e0    : compare the words
+-	ev6_unop
+-	ev6_unop
+-	bne	t7, $eos	# .. e1 :
+-
+-	cmpeq	a3, 0, t5	# e0    : eoc in s2[1]
+-	ev6_unop
+-	ev6_unop
+-	bne	t3, $wordcmp	# .. e1 :
+-
+-	or	t4, t5, t4	# e0    : eos or eoc in s2[1].
+-	beq	t4, $u_loop	# .. e1 (zdb)
+-
+-	/* We've found a zero in the low bits of the last s2 word.  Get
+-	   the next s1 word and align them.  */
+-	.align 3
+-$u_final:
+-	ldq_u	t0, 8(a0)
+-	extql	t2, a1, t1
+-	cmpbge	zero, t1, t7
+-	bne	a2, $eos
+-
+-	/* We've hit end of count.  Zero everything after the count
+-	   and compare whats left.  */
+-	.align 3
+-$eoc:
+-	mskql	t0, t10, t0
+-	mskql	t1, t10, t1
+-	cmpbge	zero, t1, t7
+-
+-	/* We've found a zero somewhere in a word we just read.
+-	   On entry to this basic block:
+-	   t0 == s1 word
+-	   t1 == s2 word
+-	   t7 == cmpbge mask containing the zero.  */
+-	.align 3
+-$eos:
+-	negq	t7, t6		# create bytemask of valid data
+-	and	t6, t7, t8
+-	subq	t8, 1, t6
+-	or	t6, t8, t7
+-	zapnot	t0, t7, t0	# kill the garbage
+-	zapnot	t1, t7, t1
+-	xor	t0, t1, v0	# ... and compare
+-	beq	v0, $done
+-
+-	/* Here we have two differing co-aligned words in t0 & t1.
+-	   Bytewise compare them and return (t0 > t1 ? 1 : -1).  */
+-	.align 3
+-$wordcmp:
+-	cmpbge	t0, t1, t2	# comparison yields bit mask of ge
+-	cmpbge	t1, t0, t3
+-	xor	t2, t3, t0	# bits set iff t0/t1 bytes differ
+-	negq	t0, t1		# clear all but least bit
+-	and	t0, t1, t0
+-	lda	v0, -1
+-	and	t0, t2, t1	# was bit set in t0 > t1?
+-	cmovne	t1, 1, v0
+-$done:
+-	ret
+-
+-	.align 3
+-$zerolength:
+-	clr	v0
+-	ret
+-
+-	END(strncmp)
+-libc_hidden_builtin_def (strncmp)

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+case $1 in
+	(upgrade|install)
+	# We want /usr/include/sys to be a normal directory instead
+	# of a symlink
+	if test -h /usr/include/sys ; then
+		rm -f /usr/include/sys
+	fi
+	;;
+	(*)
+	;;
+esac

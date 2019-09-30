@@ -1,0 +1,55 @@
+commit 75b1f41bac0b70d9f87fbafde7cb94b9da3607c1
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Thu Aug 20 23:30:14 2015 +0200
+
+    Fix raise.c build
+    
+    * sysdeps/generic/raise.c: Include <pthread.h> instead of non-existing
+    "sig-internal.h"
+
+commit 42889b484ae0cae466a63e13e25a117094732e75
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Thu Aug 20 23:50:47 2015 +0200
+
+    Drop debugging statements
+    
+    * sysdeps/generic/raise.c (raise): Do not call debug.
+
+commit 8ffa76b6e9af0df8531278f15aa6301b1b5ba76f
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Thu Aug 20 23:57:54 2015 +0200
+
+    Fix raise thread-aware implementation
+    
+    * sysdeps/generic/raise.c (pthread_kill): Make ref weak.
+    (raise): Only call pthread_kill when it is not NULL.  Call kill otherwise.
+
+--- a/libpthread/sysdeps/generic/raise.c
++++ b/libpthread/sysdeps/generic/raise.c
+@@ -18,8 +18,10 @@
+    License along with this program.  If not, see
+    <http://www.gnu.org/licenses/>.  */
+ 
+-#include "sig-internal.h"
++#include <pthread.h>
+ 
++#pragma weak pthread_kill
++#pragma weak pthread_self
+ int
+ raise (int signo)
+ {
+@@ -27,9 +28,11 @@ raise (int signo)
+      "the effect of the raise() function shall be equivalent to
+      calling: pthread_kill(pthread_self(), sig);"  */
+ 
+-debug (0, "");
+-  int err = pthread_kill (pthread_self (), signo);
+-debug (0, "");
++  int err;
++  if (pthread_kill)
++    err = pthread_kill (pthread_self (), signo);
++  else
++    err = __kill (__getpid (), signo);
+   if (err)
+     {
+       errno = err;

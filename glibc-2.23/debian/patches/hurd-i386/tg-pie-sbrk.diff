@@ -1,0 +1,34 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: Fix sbrk in PIE binaries
+
+In PIE mode, the program gets loaded at very low address, and thus _end is very
+low, just before libraries, and thus initializing the brk to it does not make
+sense, since there is no room left there. Hardcode the brk to 0x8000000 for now
+as a workaround.
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+---
+ sysdeps/mach/hurd/brk.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/sysdeps/mach/hurd/brk.c b/sysdeps/mach/hurd/brk.c
+index 1900277..fb74e83 100644
+--- a/sysdeps/mach/hurd/brk.c
++++ b/sysdeps/mach/hurd/brk.c
+@@ -143,8 +143,12 @@ init_brk (void)
+   /* If _hurd_brk is already set, don't change it.  The assumption is that
+      it was set in a previous run before something like Emacs's unexec was
+      called and dumped all the data up to the break at that point.  */
+-  if (_hurd_brk == 0)
++  if (_hurd_brk == 0) {
+     _hurd_brk = (vm_address_t) &_end;
++    if (_hurd_brk < 0x8000000)
++      /* XXX: PIE case, get out of library area */
++      _hurd_brk = 0x8000000;
++  }
+ 
+   pagend = round_page (_hurd_brk);
+ 
+-- 
+tg: (4a7fa7e..) t/pie-sbrk (depends on: baseline)

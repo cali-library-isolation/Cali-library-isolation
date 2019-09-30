@@ -1,0 +1,16 @@
+--- x/sysdeps/unix/sysv/linux/i386/readelflib.c	2012-03-21 14:25:11.000000000 -0600
++++ x/sysdeps/unix/sysv/linux/i386/readelflib.c	2013-01-23 21:17:58.748565867 -0700
+@@ -62,8 +62,11 @@
+ #ifndef SKIP_EM_IA_64
+ failed:
+ #endif
+-      error (0, 0, _("%s is for unknown machine %d.\n"),
+-	     file_name, elf_header->e_machine);
++      if (opt_verbose)
++	{
++	  error (0, 0, _("%s is for unknown machine %d.\n"),
++		file_name, elf_header->e_machine);
++	}
+       return 1;
+     }
+ 

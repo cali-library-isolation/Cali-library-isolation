@@ -1,0 +1,34 @@
+.TH PTHREAD_ONCE 3 LinuxThreads
+
+.SH NAME
+pthread_once \- once-only initialization
+
+.SH SYNOPSIS
+.B #include <pthread.h>
+
+.BI "pthread_once_t " once_control " = PTHREAD_ONCE_INIT;"
+
+.BI "int pthread_once(pthread_once_t *" once_control ", void (*" init_routine ") (void));"
+
+.SH DESCRIPTION
+
+The purpose of \fBpthread_once\fP is to ensure that a piece of
+initialization code is executed at most once. The \fIonce_control\fP
+argument points to a static or extern variable statically initialized
+to \fBPTHREAD_ONCE_INIT\fP.
+
+The first time \fBpthread_once\fP is called with a given \fIonce_control\fP
+argument, it calls \fIinit_routine\fP with no argument and changes the
+value of the \fIonce_control\fP variable to record that initialization has
+been performed. Subsequent calls to \fBpthread_once\fP with the same
+\fBonce_control\fP argument do nothing. 
+
+.SH "RETURN VALUE"
+\fBpthread_once\fP always returns 0.
+
+.SH ERRORS
+None.
+
+.SH AUTHOR
+Xavier Leroy <Xavier.Leroy@inria.fr>
+

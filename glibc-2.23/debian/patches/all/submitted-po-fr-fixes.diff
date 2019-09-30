@@ -1,0 +1,17 @@
+2014-05-05  Aurelien Jarno  <aurelien@aurel32.net>
+
+	* po/fr.po: Fix French translation of inappropriate.
+
+diff --git a/po/fr.po b/po/fr.po
+index f73622a..3625de1 100644
+--- a/po/fr.po
++++ b/po/fr.po
+@@ -6015,7 +6015,7 @@ msgstr "Trop de fichiers ouverts dans le système"
+ #. TRANS modes on an ordinary file.
+ #: sysdeps/gnu/errlist.c:286
+ msgid "Inappropriate ioctl for device"
+-msgstr "Ioctl() inappropré pour un périphérique"
++msgstr "Ioctl() inapproprié pour un périphérique"
+ 
+ #. TRANS An attempt to execute a file that is currently open for writing, or
+ #. TRANS write to a file that is currently being executed.  Often using a

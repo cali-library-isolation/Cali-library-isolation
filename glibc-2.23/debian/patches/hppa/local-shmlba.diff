@@ -1,0 +1,13 @@
+Index: eglibc-2.18/sysdeps/unix/sysv/linux/hppa/bits/shm.h
+===================================================================
+--- eglibc-2.18.orig/sysdeps/unix/sysv/linux/hppa/bits/shm.h	2013-01-09 19:28:48.000000000 -0500
++++ eglibc-2.18/sysdeps/unix/sysv/linux/hppa/bits/shm.h	2014-04-09 21:08:06.516202583 -0400
+@@ -36,7 +36,7 @@
+ #define SHM_UNLOCK	12		/* unlock segment (root only) */
+ 
+ /* Segment low boundary address multiple.  */
+-#define SHMLBA 0x00400000		/* address needs to be 4 Mb aligned */
++#define SHMLBA		(__getpagesize ())
+ 
+ /* Type to count number of attaches.  */
+ typedef unsigned long int shmatt_t;

@@ -1,0 +1,33 @@
+Subject: [PATCH] t/pagesize
+
+From: Thomas Schwinge <thomas@schwinge.name>
+
+WIP.  id:"87mxd9hl2n.fsf@kepler.schwinge.homeip.net"
+
+---
+ elf/dl-support.c |    2 +-
+ elf/rtld.c       |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+--- a/elf/dl-support.c
++++ b/elf/dl-support.c
+@@ -145,7 +145,7 @@ hp_timing_t _dl_cpuclock_offset;
+ 
+ void (*_dl_init_static_tls) (struct link_map *) = &_dl_nothread_init_static_tls;
+ 
+-size_t _dl_pagesize = EXEC_PAGESIZE;
++size_t _dl_pagesize = /* EXEC_PAGESIZE */ 4096;
+ 
+ int _dl_inhibit_cache;
+ 
+--- a/elf/rtld.c
++++ b/elf/rtld.c
+@@ -164,7 +164,7 @@ struct rtld_global_ro _rtld_global_ro at
+     ._dl_hwcap_mask = HWCAP_IMPORTANT,
+     ._dl_lazy = 1,
+     ._dl_fpu_control = _FPU_DEFAULT,
+-    ._dl_pagesize = EXEC_PAGESIZE,
++    ._dl_pagesize = /* EXEC_PAGESIZE */ 4096,
+     ._dl_inhibit_cache = 0,
+ 
+     /* Function pointers.  */

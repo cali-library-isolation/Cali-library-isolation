@@ -1,0 +1,7 @@
+libc {
+  GLIBC_2.2.6 {
+    i386_get_ioperm; i386_set_ioperm; i386_vm86;
+    ioperm; iopl;
+    i386_get_ldt; i386_set_ldt;
+  }
+}

@@ -1,0 +1,33 @@
+Description: Fix dlopen segfault in statically linked programs
+Author: Maciej Rozycki
+Origin: http://www.eglibc.org/archives/issues/msg00084.html
+Last-Update: 2013-10-09
+
+Index: b/elf/dl-open.c
+===================================================================
+--- a/elf/dl-open.c
++++ b/elf/dl-open.c
+@@ -92,11 +92,22 @@
+      anymore.  Instead the malloc() implementation of the libc is
+      used.  But this means the block from the main map cannot be used
+      in an realloc() call.  Therefore we allocate a completely new
+-     array the first time we have to add something to the locale scope.  */
++     array the first time we have to add something to the locale scope.
++
++     Also the list may be missing altogether if we are called via
++     dlopen() from a statically linked executable as in this case ld.so
++     has not been called and no dynamic symbols have been pulled yet.
++     Start a new list in this case.  */
+ 
+   struct link_namespaces *ns = &GL(dl_ns)[new->l_ns];
+   if (ns->_ns_global_scope_alloc == 0)
+     {
++      /* See if we've got a list at all.  */
++      if (ns->_ns_main_searchlist == NULL)
++	ns->_ns_main_searchlist = calloc (1, sizeof (struct r_scope_elem));
++      if (ns->_ns_main_searchlist == NULL)
++	goto nomem;
++
+       /* This is the first dynamic object given global scope.  */
+       ns->_ns_global_scope_alloc
+ 	= ns->_ns_main_searchlist->r_nlist + to_add + 8;

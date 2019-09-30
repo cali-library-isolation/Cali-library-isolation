@@ -1,0 +1,198 @@
+# All lines beginning with `# DP:' are a description of the patch.
+# DP: Description: Various fixes for all French locales
+# DP: Related bugs: #248377  #351786 #345481
+# DP: Dpatch author: Denis Barbier <barbier@debian.org>
+# DP: Patch author: Denis Barbier
+# DP: Upstream status: not submitted
+# DP: Date: 2006-01-10
+
+---
+ localedata/locales/fr_BE |   20 +++++++++++++++-----
+ localedata/locales/fr_CA |   15 ++++++++++-----
+ localedata/locales/fr_CH |   19 ++++++++++++++-----
+ localedata/locales/fr_FR |   21 ++++++++++++++++++---
+ localedata/locales/fr_LU |   19 ++++++++++++++-----
+ 5 files changed, 71 insertions(+), 23 deletions(-)
+
+--- a/localedata/locales/fr_BE
++++ b/localedata/locales/fr_BE
+@@ -117,9 +118,10 @@
+ t_fmt   "<U0025><U0054>"
+ am_pm   "";""
+ t_fmt_ampm ""
+-date_fmt       "<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+-<U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+-<U0025><U005A><U0020><U0025><U0059>"
++date_fmt "<U0025><U0041><U0020><U0025><U002D><U0065><U0020>/
++<U0025><U0042><U0020><U0025><U0059><U002C><U0020>/
++<U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
++<U0028><U0055><U0054><U0043><U0025><U007A><U0029>"
+ 
+ week    7;19971130;4
+ first_weekday 2
+@@ -146,8 +148,7 @@
+ END LC_MEASUREMENT
+ 
+ LC_NAME
+-name_fmt    "<U0025><U0064><U0025><U0074><U0025><U0067><U0025><U0074>/
+-<U0025><U006D><U0025><U0074><U0025><U0066>"
++copy "fr_FR"
+ END LC_NAME
+ 
+ LC_ADDRESS
+@@ -159,6 +160,9 @@
+ country_ab2 "<U0042><U0045>"
+ country_ab3 "<U0042><U0045><U004C>"
+ country_num 056
++country_name "<U0042><U0065><U006C><U0067><U0069><U0071><U0075><U0065>"
++country_post "<U0042><U0045>"
++country_isbn 2
+ % B
+ country_car    "<U0042>"
+ % Français
+--- a/localedata/locales/fr_CA
++++ b/localedata/locales/fr_CA
+@@ -115,9 +116,10 @@
+ t_fmt   "<U0025><U0054>"
+ am_pm   "";""
+ t_fmt_ampm ""
+-date_fmt       "<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+-<U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+-<U0025><U005A><U0020><U0025><U0059>"
++date_fmt "<U0025><U0041><U0020><U0025><U002D><U0065><U0020>/
++<U0025><U0042><U0020><U0025><U0059><U002C><U0020>/
++<U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
++<U0028><U0055><U0054><U0043><U0025><U007A><U0029>"
+ END LC_TIME
+ 
+ LC_PAPER
+@@ -133,8 +135,7 @@
+ END LC_MEASUREMENT
+ 
+ LC_NAME
+-name_fmt    "<U0025><U0064><U0025><U0074><U0025><U0067><U0025><U0074>/
+-<U0025><U006D><U0025><U0074><U0025><U0066>"
++copy "fr_FR"
+ END LC_NAME
+ 
+ LC_ADDRESS
+@@ -146,6 +147,9 @@
+ country_ab2 "<U0043><U0041>"
+ country_ab3 "<U0043><U0041><U004E>"
+ country_num 124
++country_name "<U0043><U0061><U006E><U0061><U0064><U0061>"
++country_post "<U0043><U0041>"
++country_isbn 2
+ % CDN
+ country_car    "<U0043><U0044><U004E>"
+ % Français
+--- a/localedata/locales/fr_CH
++++ b/localedata/locales/fr_CH
+@@ -102,9 +103,10 @@
+ t_fmt   "<U0025><U0054>"
+ am_pm   "";""
+ t_fmt_ampm ""
+-date_fmt       "<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+-<U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+-<U0025><U005A><U0020><U0025><U0059>"
++date_fmt "<U0025><U0041><U0020><U0025><U002D><U0065><U0020>/
++<U0025><U0042><U0020><U0025><U0059><U002C><U0020>/
++<U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
++<U0028><U0055><U0054><U0043><U0025><U007A><U0029>"
+ END LC_TIME
+ 
+ LC_PAPER
+@@ -126,8 +128,7 @@
+ END LC_MEASUREMENT
+ 
+ LC_NAME
+-name_fmt    "<U0025><U0064><U0025><U0074><U0025><U0067><U0025><U0074>/
+-<U0025><U006D><U0025><U0074><U0025><U0066>"
++copy "fr_FR"
+ END LC_NAME
+ 
+ LC_ADDRESS
+@@ -139,6 +140,9 @@
+ country_ab2 "<U0043><U0048>"
+ country_ab3 "<U0043><U0048><U0045>"
+ country_num 756
++country_name "<U0053><U0075><U0069><U0073><U0073><U0065>"
++country_post "<U0043><U0048>"
++country_isbn 2
+ % CH
+ country_car    "<U0043><U0048>"
+ % Français
+--- a/localedata/locales/fr_FR
++++ b/localedata/locales/fr_FR
+@@ -137,9 +138,10 @@
+ t_fmt   "<U0025><U0054>"
+ am_pm   "";""
+ t_fmt_ampm ""
+-date_fmt       "<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+-<U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+-<U0025><U005A><U0020><U0025><U0059>"
++date_fmt "<U0025><U0041><U0020><U0025><U002D><U0065><U0020>/
++<U0025><U0042><U0020><U0025><U0059><U002C><U0020>/
++<U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
++<U0028><U0055><U0054><U0043><U0025><U007A><U0029>"
+ 
+ week    7;19971130;4
+ first_weekday 2
+@@ -166,6 +168,11 @@
+ LC_NAME
+ name_fmt    "<U0025><U0064><U0025><U0074><U0025><U0067><U0025><U0074>/
+ <U0025><U006D><U0025><U0074><U0025><U0066>"
++name_gen    ""
++name_mr     "<U004D><U002E>"
++name_mrs    "<U004D><U006D><U0065>"
++name_miss   "<U004D><U006C><U006C><U0065>"
++name_ms     ""
+ END LC_NAME
+ 
+ LC_ADDRESS
+@@ -177,6 +184,9 @@
+ country_ab2 "<U0046><U0052>"
+ country_ab3 "<U0046><U0052><U0041>"
+ country_num 250
++country_name "<U0046><U0072><U0061><U006E><U0063><U0065>"
++country_post "<U0046><U0052>"
++country_isbn 2
+ % F
+ country_car    "<U0046>"
+ % Français
+--- a/localedata/locales/fr_LU
++++ b/localedata/locales/fr_LU
+@@ -117,9 +118,10 @@
+ t_fmt   "<U0025><U0054>"
+ am_pm   "";""
+ t_fmt_ampm ""
+-date_fmt       "<U0025><U0061><U0020><U0025><U0062><U0020><U0025><U0065>/
+-<U0020><U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
+-<U0025><U005A><U0020><U0025><U0059>"
++date_fmt "<U0025><U0041><U0020><U0025><U002D><U0065><U0020>/
++<U0025><U0042><U0020><U0025><U0059><U002C><U0020>/
++<U0025><U0048><U003A><U0025><U004D><U003A><U0025><U0053><U0020>/
++<U0028><U0055><U0054><U0043><U0025><U007A><U0029>"
+ first_workday 2
+ first_weekday 2
+ END LC_TIME
+@@ -143,8 +145,7 @@
+ END LC_MEASUREMENT
+ 
+ LC_NAME
+-name_fmt    "<U0025><U0064><U0025><U0074><U0025><U0067><U0025><U0074>/
+-<U0025><U006D><U0025><U0074><U0025><U0066>"
++copy "fr_FR"
+ END LC_NAME
+ 
+ LC_ADDRESS
+@@ -156,6 +157,9 @@
+ country_ab2 "<U004C><U0055>"
+ country_ab3 "<U004C><U0055><U0058>"
+ country_num 442
++country_name "<U004C><U0075><U0078><U0065><U006D><U0062><U006F><U0075><U0072><U0067>"
++country_post "<U004C><U0055>"
++country_isbn 2
+ % L
+ country_car    "<U004C>"
+ % Français

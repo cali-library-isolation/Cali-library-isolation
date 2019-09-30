@@ -1,0 +1,24 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: [PATCH] Correction traduction « Computer bought the farm »
+
+* po/fr.po: Fix EIEIO french translation.
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+---
+ po/fr.po |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: glibc-2.21/po/fr.po
+===================================================================
+--- glibc-2.21.orig/po/fr.po
++++ glibc-2.21/po/fr.po
+@@ -6464,7 +6464,7 @@ msgstr "Vous avez vraiment tout gâcher
+ #. TRANS Go home and have a glass of warm, dairy-fresh milk.
+ #: sysdeps/gnu/errlist.c:986
+ msgid "Computer bought the farm"
+-msgstr "L'ordinateur a acheté la ferme"
++msgstr "L'ordinateur a cassé sa pipe"
+ 
+ #. TRANS This error code has no purpose.
+ #: sysdeps/gnu/errlist.c:995

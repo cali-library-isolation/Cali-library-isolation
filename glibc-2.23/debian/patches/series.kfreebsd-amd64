@@ -1,0 +1,6 @@
+kfreebsd/local-memusage_no_mremap.diff
+kfreebsd/local-sys_queue_h.diff
+kfreebsd/local-undef-glibc.diff
+kfreebsd/local-initgroups-order.diff
+kfreebsd/local-tst-auxv.diff
+kfreebsd/local-tst-unique.diff

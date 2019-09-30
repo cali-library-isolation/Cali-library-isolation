@@ -1,0 +1,38 @@
+# All lines beginning with `# DP:' are a description of the patch.
+# DP: Description: support alternative gettext tree in
+# DP: /usr/share/locale-langpack
+# DP: Dpatch author: Martin Pitt <martin.pitt@canonical.com>
+# DP: Patch author: Martin Pitt <martin.pitt@canonical.com>
+# DP: Upstream status: Ubuntu-Specific
+# DP: Date: 2004-12-06 20:44:10 CET
+# DP: Updated: 2016-10-05 13:51:00 CET
+
+--- glibc-2.3.5.orig/intl/l10nflist.c
++++ glibc-2.3.5/intl/l10nflist.c
+@@ -267,7 +267,7 @@ _nl_make_l10nflist (l10nfile_list, dirli
+ 
+   retval = (struct loaded_l10nfile *)
+     malloc (sizeof (*retval) + (__argz_count (dirlist, dirlist_len)
+-				* (1 << pop (mask))
++				* 2 * (1 << pop (mask))
+ 				* sizeof (struct loaded_l10nfile *)));
+   if (retval == NULL)
+     {
+@@ -310,6 +310,17 @@ _nl_make_l10nflist (l10nfile_list, dirli
+ 				  language, territory, codeset,
+ 				  normalized_codeset, modifier, filename, 1);
+       }
++  const char* langpack_dir = "/usr/share/locale-langpack";
++  if (strncmp(filename, "LC_MESSAGES", strlen("LC_MESSAGES")) == 0) {
++    for (cnt = mask; cnt >= 0; --cnt)
++      if ((cnt & ~mask) == 0)
++	{
++	    retval->successor[entries++]
++	      = _nl_make_l10nflist (l10nfile_list, langpack_dir, strlen (langpack_dir) + 1, cnt,
++				    language, territory, codeset,
++				    normalized_codeset, modifier, filename, 1);
++	}
++  }
+   retval->successor[entries] = NULL;
+ 
+   return retval;

@@ -1,0 +1,16 @@
+Description: Don't warn for _BSD_SOURCE || _SVID_SOURCE, drop post-vivid
+Author: Adam Conrad <adconrad@ubuntu.com>
+
+--- glibc-2.21.orig/include/features.h
++++ glibc-2.21/include/features.h
+@@ -145,7 +145,10 @@
+    transitioned to use the new macro.  */
+ #if (defined _BSD_SOURCE || defined _SVID_SOURCE) \
+     && !defined _DEFAULT_SOURCE
++/* Don't #warn about _BSD_SOURCE || _SVID_SOURCE, as it breaks -Werror
++   and we don't have time to check/fix everything before vivid release
+ # warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE"
++*/
+ # undef  _DEFAULT_SOURCE
+ # define _DEFAULT_SOURCE	1
+ #endif

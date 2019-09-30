@@ -1,0 +1,21 @@
+commit c775104ac6c36d010570811c1e038ac92094e5e5
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Sun Mar 20 19:50:58 2016 +0100
+
+    Fix mach-syscalls.mk build
+    
+    	* mach/Makefile ($(objpfx)mach-syscalls.mk): Depend on libc-modules.h.
+
+diff --git a/mach/Makefile b/mach/Makefile
+index 2a695a5..c58d235 100644
+--- a/mach/Makefile
++++ b/mach/Makefile
+@@ -61,7 +61,7 @@ mach-machine = $(patsubst powerpc,ppc,$(base-machine))
+ ifndef inhibit_mach_syscalls
+ -include $(objpfx)mach-syscalls.mk
+ endif
+-$(objpfx)mach-syscalls.mk: syscalls.awk Makefile
++$(objpfx)mach-syscalls.mk: syscalls.awk Makefile libc-modules.h
+ # Go kludges!!!
+ 	$(make-target-directory)
+ # We must use $(CFLAGS) to get -O flags that affect #if's in header files.

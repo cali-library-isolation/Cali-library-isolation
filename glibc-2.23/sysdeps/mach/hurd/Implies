@@ -1,0 +1,7 @@
+# The gnu subdirectory exists for things common to both Linux-based and
+# Hurd-based GNU systems.
+gnu
+# The Hurd provides a rough superset of the functionality of 4.4 BSD.
+unix/bsd
+# libpthread provides generic bits
+../libpthread/sysdeps/generic

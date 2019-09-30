@@ -1,0 +1,12 @@
+#define __mach_port_insert_right mach_port_insert_right
+#define __mach_port_allocate	mach_port_allocate
+#define __mig_init		mig_init
+#define __thread_create		thread_create
+#define __thread_get_state	thread_get_state
+#define __thread_resume		thread_resume
+#define __thread_set_state	thread_set_state
+#define __thread_terminate	thread_terminate
+#define __thread_terminate_release	thread_terminate_release
+#define __vm_allocate		vm_allocate
+#define __vm_deallocate		vm_deallocate
+#define __sched_yield           sched_yield

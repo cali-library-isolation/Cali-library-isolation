@@ -1,0 +1,46 @@
+From: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Subject: [PATCH] Allow unknown root directory.
+
+To be efficient, the remap translator simply returns ports from the underlying
+filesystem, and thus the root directory found through browsing '..' is the
+underlying root, not the remap root. This should not be a reason for getcwd to
+fail.
+
+* sysdeps/mach/hurd/getcwd.c (_hurd_canonicalize_directory_name_internal): Do
+not remove the heading slash if we got an unknown root directory.
+(__getcwd): Do not fail with EGRATUITOUS if we got an unknown root directory.
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+---
+ sysdeps/mach/hurd/getcwd.c |   12 ------------
+ 1 file changed, 12 deletions(-)
+
+--- a/sysdeps/mach/hurd/getcwd.c
++++ b/sysdeps/mach/hurd/getcwd.c
+@@ -266,11 +266,6 @@ _hurd_canonicalize_directory_name_intern
+        So the root is our current directory.  */
+     *--file_namep = '/';
+ 
+-  if (thisid != rootid)
+-    /* We did not get to our root directory. The returned name should
+-       not begin with a slash.  */
+-    ++file_namep;
+-
+   memmove (file_name, file_namep, file_name + size - file_namep);
+   cleanup ();
+   return file_name;
+@@ -310,13 +305,6 @@ __getcwd (char *buf, size_t size)
+     __USEPORT (CWDIR,
+ 	       _hurd_canonicalize_directory_name_internal (port,
+ 							   buf, size));
+-  if (cwd && cwd[0] != '/')
+-    {
+-      /* `cwd' is an unknown root directory.  */
+-      if (buf == NULL)
+-	  free (cwd);
+-      return __hurd_fail (EGRATUITOUS), NULL;
+-    }
+   return cwd;
+ }
+ weak_alias (__getcwd, getcwd)

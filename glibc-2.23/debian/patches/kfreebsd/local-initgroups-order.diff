@@ -1,0 +1,38 @@
+
+ setgroups(size, groups) changes egid on kfreebsd, 
+ precisely groups[0] is the new egid
+
+ initgroups(user, gid) prepares the "groups" list
+ via internal_getgrouplist(). 
+ It puts supplied gid as the first entry in all but NSCD cases.
+ Fix the remaining NSCD case, see #698102, #699593.
+
+
+--- a/nscd/nscd_initgroups.c
++++ b/nscd/nscd_initgroups.c
+@@ -145,15 +145,23 @@
+     }
+ 
+   /* Check whether GROUP is part of the mix.  If not, add it.  */
++  /* The GROUP have to be in the first entry */
+   if (retval >= 0)
+     {
+       int cnt;
++      gid_t sg, tg;
++      sg = group;
+       for (cnt = 0; cnt < retval; ++cnt)
+-	if ((*groupsp)[cnt] == group)
++      {
++        tg = (*groupsp)[cnt];
++        (*groupsp)[cnt] = sg;
++        if (tg == group)
+ 	  break;
++        sg = tg;
++      }  
+ 
+       if (cnt == retval)
+-	(*groupsp)[retval++] = group;
++	(*groupsp)[retval++] = sg;
+     }
+ 
+  out_close:

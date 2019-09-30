@@ -1,0 +1,82 @@
+commit 23971d2e026d0f6843db02009fd19b8a260e25d7
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Sun Mar 20 17:56:47 2016 +0100
+
+    hurd: Do not hide rtld symbols which need to be preempted
+    
+    	* sysdeps/generic/dl-fcntl.h: New file, adds attribute_hidden to __open
+    	and __fcntl.
+    	* sysdeps/mach/hurd/dl-fcntl.h: New file, adds attribute_hidden to
+    	__fcntl only.
+    	* include/fcntl.h [IS_IN (rtld)]: Include <dl-fcntl.h> instead of
+    	adding attribute_hidden to __open and __fcntl.
+
+diff --git a/include/fcntl.h b/include/fcntl.h
+index 4168ee4..3b2c887 100644
+--- a/include/fcntl.h
++++ b/include/fcntl.h
+@@ -31,8 +31,7 @@ extern int __openat64_2 (int __fd, const char *__path, int __oflag);
+ 
+ 
+ #if IS_IN (rtld)
+-extern __typeof (__open) __open attribute_hidden;
+-extern __typeof (__fcntl) __fcntl attribute_hidden;
++#  include <dl-fcntl.h>
+ #endif
+ 
+ /* Flag determining whether the *at system calls are available.  */
+diff --git a/sysdeps/generic/dl-fcntl.h b/sysdeps/generic/dl-fcntl.h
+new file mode 100644
+index 0000000..ee3c49c
+--- /dev/null
++++ b/sysdeps/generic/dl-fcntl.h
+@@ -0,0 +1,21 @@
++/* Functions with hidden attribute internal to ld.so, which are declared
++   in include/fcntl.h.  Generic version.
++   Copyright (C) 2016 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++extern __typeof (__open) __open attribute_hidden;
++extern __typeof (__fcntl) __fcntl attribute_hidden;
+diff --git a/sysdeps/mach/hurd/dl-fcntl.h b/sysdeps/mach/hurd/dl-fcntl.h
+new file mode 100644
+index 0000000..c34bf12
+--- /dev/null
++++ b/sysdeps/mach/hurd/dl-fcntl.h
+@@ -0,0 +1,22 @@
++/* Functions with hidden attribute internal to ld.so, which are declared
++   in include/fcntl.h.  Hurd version.
++   Copyright (C) 2016 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++/* __open can't be hidden in ld.so on Hurd since it will be preempted by the
++   one in libc.so after bootstrap.  */
++extern __typeof (__fcntl) __fcntl attribute_hidden;

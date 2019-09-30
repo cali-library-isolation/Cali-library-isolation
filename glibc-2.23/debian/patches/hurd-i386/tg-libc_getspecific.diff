@@ -1,0 +1,12 @@
+Drop once updated to a libpthread which doesn't define __libc_getspecific
+
+--- a/sysdeps/mach/hurd/cthreads.c
++++ b/sysdeps/mach/hurd/cthreads.c
+@@ -59,6 +59,7 @@ cthread_setspecific (key, val)
+ /* Call cthread_getspecific which gets a pointer to the return value instead
+    of just returning it.  */
+ void *
++weak_function
+ __libc_getspecific (cthread_key_t key)
+ {
+   void *val;

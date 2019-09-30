@@ -1,0 +1,18 @@
+Increase the maximal overall growth of the compilation unit caused
+by inlining for dl-reloc.c on hppa. This remove some warnings and 
+strangely it reduces the size of the final binary.
+
+---
+ sysdeps/hppa/Makefile |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/sysdeps/hppa/Makefile
++++ b/sysdeps/hppa/Makefile
+@@ -23,6 +23,7 @@
+ 
+ ifeq ($(subdir),elf)
+ CFLAGS-rtld.c += -mdisable-fpregs
++CFLAGS-dl-reloc.c += --param inline-unit-growth=100
+ sysdep-dl-routines += dl-symaddr dl-fptr
+ # dl-fptr.c needs a complete rewrite to fix ISO C aliasing violations.
+ CFLAGS-dl-fptr.c = -Wno-error

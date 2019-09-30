@@ -1,0 +1,229 @@
+.TH PTHREAD_COND 3 LinuxThreads
+
+
+.SH NAME
+pthread_cond_init, pthread_cond_destroy, pthread_cond_signal, pthread_cond_broadcast, pthread_cond_wait, pthread_cond_timedwait \- operations on conditions
+
+.SH SYNOPSIS
+.B #include <pthread.h>
+
+.BI "pthread_cond_t " cond " = PTHREAD_COND_INITIALIZER;"
+
+.BI "int pthread_cond_init(pthread_cond_t *" cond ", pthread_condattr_t *" cond_attr ");"
+
+.BI "int pthread_cond_signal(pthread_cond_t *" cond ");"
+
+.BI "int pthread_cond_broadcast(pthread_cond_t *" cond ");"
+
+.BI "int pthread_cond_wait(pthread_cond_t *" cond ", pthread_mutex_t *" mutex ");"
+
+.BI "int pthread_cond_timedwait(pthread_cond_t *" cond ", pthread_mutex_t *" mutex ", const struct timespec *" abstime ");"
+
+.BI "int pthread_cond_destroy(pthread_cond_t *" cond ");"
+
+.SH DESCRIPTION
+
+A condition (short for ``condition variable'') is a synchronization
+device that allows threads to suspend execution and relinquish the
+processors until some predicate on shared data is satisfied. The basic
+operations on conditions are: signal the condition (when the
+predicate becomes true), and wait for the condition, suspending the
+thread execution until another thread signals the condition.
+
+A condition variable must always be associated with a mutex, to avoid
+the race condition where a thread prepares to wait on a condition
+variable and another thread signals the condition just before the
+first thread actually waits on it.
+
+\fBpthread_cond_init\fP initializes the condition variable \fIcond\fP, using the
+condition attributes specified in \fIcond_attr\fP, or default attributes
+if \fIcond_attr\fP is \fBNULL\fP. The LinuxThreads implementation supports no
+attributes for conditions, hence the \fIcond_attr\fP parameter is actually
+ignored.
+
+Variables of type \fBpthread_cond_t\fP can also be initialized
+statically, using the constant \fBPTHREAD_COND_INITIALIZER\fP.
+
+\fBpthread_cond_signal\fP restarts one of the threads that are waiting on
+the condition variable \fIcond\fP. If no threads are waiting on \fIcond\fP,
+nothing happens. If several threads are waiting on \fIcond\fP, exactly one
+is restarted, but it is not specified which.
+
+\fBpthread_cond_broadcast\fP restarts all the threads that are waiting on
+the condition variable \fIcond\fP. Nothing happens if no threads are
+waiting on \fIcond\fP.
+
+\fBpthread_cond_wait\fP atomically unlocks the \fImutex\fP (as per
+\fBpthread_unlock_mutex\fP) and waits for the condition variable \fIcond\fP to
+be signaled. The thread execution is suspended and does not consume
+any CPU time until the condition variable is signaled. The \fImutex\fP
+must be locked by the calling thread on entrance to
+\fBpthread_cond_wait\fP. Before returning to the calling thread,
+\fBpthread_cond_wait\fP re-acquires \fImutex\fP (as per \fBpthread_lock_mutex\fP).
+
+Unlocking the mutex and suspending on the condition variable is done
+atomically. Thus, if all threads always acquire the mutex before
+signaling the condition, this guarantees that the condition cannot be
+signaled (and thus ignored) between the time a thread locks the mutex
+and the time it waits on the condition variable.
+
+\fBpthread_cond_timedwait\fP atomically unlocks \fImutex\fP and waits on
+\fIcond\fP, as \fBpthread_cond_wait\fP does, but it also bounds the duration
+of the wait. If \fIcond\fP has not been signaled within the amount of time
+specified by \fIabstime\fP, the mutex \fImutex\fP is re-acquired and
+\fBpthread_cond_timedwait\fP returns the error \fBETIMEDOUT\fP.
+The \fIabstime\fP parameter specifies an absolute time, with the same
+origin as \fBtime\fP(2) and \fBgettimeofday\fP(2): an \fIabstime\fP of 0
+corresponds to 00:00:00 GMT, January 1, 1970.
+
+\fBpthread_cond_destroy\fP destroys a condition variable, freeing the
+resources it might hold. No threads must be waiting on the condition
+variable on entrance to \fBpthread_cond_destroy\fP. In the LinuxThreads
+implementation, no resources are associated with condition variables,
+thus \fBpthread_cond_destroy\fP actually does nothing except checking that
+the condition has no waiting threads.
+
+.SH CANCELLATION
+
+\fBpthread_cond_wait\fP and \fBpthread_cond_timedwait\fP are cancellation
+points. If a thread is cancelled while suspended in one of these
+functions, the thread immediately resumes execution, then locks again
+the \fImutex\fP argument to \fBpthread_cond_wait\fP and
+\fBpthread_cond_timedwait\fP, and finally executes the cancellation.
+Consequently, cleanup handlers are assured that \fImutex\fP is locked when
+they are called.
+
+.SH "ASYNC-SIGNAL SAFETY"
+
+The condition functions are not async-signal safe, and should not be
+called from a signal handler. In particular, calling
+\fBpthread_cond_signal\fP or \fBpthread_cond_broadcast\fP from a signal
+handler may deadlock the calling thread.
+
+.SH "RETURN VALUE"
+
+All condition variable functions return 0 on success and a non-zero
+error code on error.
+
+.SH ERRORS
+
+\fBpthread_cond_init\fP, \fBpthread_cond_signal\fP, \fBpthread_cond_broadcast\fP,
+and \fBpthread_cond_wait\fP never return an error code.
+
+The \fBpthread_cond_timedwait\fP function returns the following error codes
+on error:
+.RS
+.TP
+\fBETIMEDOUT\fP
+the condition variable was not signaled until the timeout specified by
+\fIabstime\fP
+
+.TP
+\fBEINTR\fP
+\fBpthread_cond_timedwait\fP was interrupted by a signal
+.RE
+
+The \fBpthread_cond_destroy\fP function returns the following error code
+on error:
+.RS
+.TP
+\fBEBUSY\fP
+some threads are currently waiting on \fIcond\fP.
+.RE
+
+.SH AUTHOR
+Xavier Leroy <Xavier.Leroy@inria.fr>
+
+.SH "SEE ALSO"
+\fBpthread_condattr_init\fP(3),
+\fBpthread_mutex_lock\fP(3),
+\fBpthread_mutex_unlock\fP(3),
+\fBgettimeofday\fP(2),
+\fBnanosleep\fP(2).
+
+.SH EXAMPLE
+
+Consider two shared variables \fIx\fP and \fIy\fP, protected by the mutex \fImut\fP,
+and a condition variable \fIcond\fP that is to be signaled whenever \fIx\fP
+becomes greater than \fIy\fP.
+
+.RS
+.ft 3
+.nf
+.sp
+int x,y;
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+.ft
+.LP
+.RE
+.fi
+
+Waiting until \fIx\fP is greater than \fIy\fP is performed as follows:
+
+.RS
+.ft 3
+.nf
+.sp
+pthread_mutex_lock(&mut);
+while (x <= y) {
+        pthread_cond_wait(&cond, &mut);
+}
+/* operate on x and y */
+pthread_mutex_unlock(&mut);
+.ft
+.LP
+.RE
+.fi
+
+Modifications on \fIx\fP and \fIy\fP that may cause \fIx\fP to become greater than
+\fIy\fP should signal the condition if needed:
+
+.RS
+.ft 3
+.nf
+.sp
+pthread_mutex_lock(&mut);
+/* modify x and y */
+if (x > y) pthread_cond_broadcast(&cond);
+pthread_mutex_unlock(&mut);
+.ft
+.LP
+.RE
+.fi
+
+If it can be proved that at most one waiting thread needs to be waken
+up (for instance, if there are only two threads communicating through
+\fIx\fP and \fIy\fP), \fBpthread_cond_signal\fP can be used as a slightly more
+efficient alternative to \fBpthread_cond_broadcast\fP. In doubt, use
+\fBpthread_cond_broadcast\fP.
+
+To wait for \fIx\fP to becomes greater than \fIy\fP with a timeout of 5
+seconds, do:
+
+.RS
+.ft 3
+.nf
+.sp
+struct timeval now;
+struct timespec timeout;
+int retcode;
+
+pthread_mutex_lock(&mut);
+gettimeofday(&now);
+timeout.tv_sec = now.tv_sec + 5;
+timeout.tv_nsec = now.tv_usec * 1000;
+retcode = 0;
+while (x <= y && retcode != ETIMEDOUT) {
+        retcode = pthread_cond_timedwait(&cond, &mut, &timeout);
+}
+if (retcode == ETIMEDOUT) {
+        /* timeout occurred */
+} else {
+        /* operate on x and y */
+}
+pthread_mutex_unlock(&mut);
+.ft
+.LP
+.RE
+.fi

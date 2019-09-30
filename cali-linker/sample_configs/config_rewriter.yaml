@@ -1,0 +1,16 @@
+---
+
+writeGraphs: true
+writeGraphsDot: true
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "program.bc"
+  library:
+    selectors:
+      - "library.bc"
+    permissions:
+      user: nobody
+      group: nobody
