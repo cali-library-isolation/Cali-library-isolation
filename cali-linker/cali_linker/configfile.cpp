@@ -22,8 +22,11 @@ namespace llvm {
 				io.mapOptional("writeGraphsDot", config.writeGraphsDot);
 				io.mapOptional("linkerOverride", config.linkerOverride);
 				io.mapOptional("addLibstdc++", config.addLibstdcxx);
+				io.mapOptional("replaceArguments", config.replaceArguments);
+				io.mapOptional("ignoreOutputs", config.ignoreOutputs);
 				io.mapOptional("filedescriptors", config.filedescriptors);
 				io.mapOptional("strongFDAnalysis", config.strongFDAnalysis);
+				io.mapOptional("strongFPAnalysis", config.strongFPAnalysis);
 				io.mapOptional("limit_struct_parts", config.limit_struct_parts);
 				io.mapOptional("limit_subnode_depth", config.limit_subnode_depth);
 			}
@@ -34,8 +37,17 @@ namespace llvm {
 		struct MappingTraits<ContextConfig> {
 			static void mapping(IO &io, ContextConfig &config) {
 				io.mapRequired("selectors", config.selectors);
+				io.mapOptional("ignored_functions", config.ignoredFunctions);
 				io.mapOptional("permissions", config.permissions);
 				io.mapOptional("instrument", config.instrument);
+				io.mapOptional("instrumentCoverage", config.instrument_coverage);
+				io.mapOptional("instrumentUser", config.instrument_user);
+				io.mapOptional("mprotect_mode", config.mprotect_mode);
+				io.mapOptional("sequential_mode", config.sequential_mode);
+				io.mapOptional("programIsForking", config.programIsForking);
+				io.mapOptional("silent", config.silent);
+				io.mapOptional("concurrentLibraryCommunication", config.concurrentLibraryCommunication);
+				io.mapOptional("function_behavior", config.functionBehavior);
 			}
 		};
 
@@ -85,6 +97,15 @@ namespace llvm {
 
 		template<>
 		struct CustomMappingTraits<std::map<std::string, int>> : public StdMapStringCustomMappingTraitsImpl<int> {};
+
+		template<>
+		struct CustomMappingTraits<std::map<std::string, std::string>> : public StdMapStringCustomMappingTraitsImpl<std::string> {};
+
+		template<>
+		struct CustomMappingTraits<std::map<std::string, std::vector<int>>> : public StdMapStringCustomMappingTraitsImpl<std::vector<int>> {};
+
+		template<>
+		struct CustomMappingTraits<std::map<std::string, std::vector<std::string>>> : public StdMapStringCustomMappingTraitsImpl<std::vector<std::string>> {};
 
 	}
 }
@@ -166,8 +187,13 @@ bool strmatch(std::string str, std::string pattern) {
 bool ContextConfig::matches(const std::string filename) const {
 	for (const auto &pattern: selectors) {
 		// std::cout << "M \"" << filename << "\" \"" << "*" + pattern << "\" => " << strmatch(filename, "*" + pattern) << std::endl;
-		if (strmatch(filename, "*" + pattern))
-			return true;
+		if (!pattern.empty() && pattern[0] == '^') {
+			if (strmatch(filename, pattern.substr(1)))
+				return true;
+		} else {
+			if (strmatch(filename, "*" + pattern))
+				return true;
+		}
 	}
 	return false;
 }

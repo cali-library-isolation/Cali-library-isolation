@@ -13,11 +13,11 @@ namespace ipcrewriter {
 	class IpcModule {
 	protected:
 		YamlConfig* config;
-		const ContextConfig* contextConfig;
 		bool mainModule = false;
 		std::string source;
 		std::set<std::string> imports;
 		std::set<std::string> exports;
+		std::vector<std::string> logEntries;
 
 	public:
 		IpcModule(const std::string &source, bool mainModule, YamlConfig* config, const ContextConfig* contextConfig)
@@ -43,17 +43,21 @@ namespace ipcrewriter {
 
 		const std::set<std::string> &getExports() const;
 
+		virtual const std::vector<std::string> &getLogEntries();
+
 		static std::shared_ptr<IpcModule> newIpcModuleFromFile(const std::string &filename, bool isMainModule, YamlConfig* config, const ContextConfig* contextConfig);
 
 		std::set<std::string> ignored; // stdlib etc
+		const ContextConfig* contextConfig;
 	};
 
 
 
 
 	class BinaryIpcModule : public IpcModule {
+		std::vector<std::string> rewrittenFilenames;
 	public:
-		BinaryIpcModule(const std::string &source, bool mainModule, YamlConfig* config, const ContextConfig* contextConfig);
+		BinaryIpcModule(const std::string &source, bool mainModule, YamlConfig* config, const ContextConfig* contextConfig, bool isMixedArchive = false);
 
 		void loadModuleFile() override;
 
@@ -62,7 +66,7 @@ namespace ipcrewriter {
 		}
 
 		std::vector<std::string> rewrittenFilename() override {
-			return {};
+			return rewrittenFilenames;
 		}
 
 		void rewriteFunctionCalls(CommunicationPair &cmp, const std::set<std::string> &symbols) override;
@@ -76,7 +80,7 @@ namespace ipcrewriter {
 	public:
 		CompositeIpcModule(bool isMainModule, YamlConfig* config, const ContextConfig* contextConfig);
 
-		static std::shared_ptr<IpcModule> newIpcModulesFromFiles(std::vector<std::string> &files, bool isMainModule, YamlConfig* config, const ContextConfig* contextConfig);
+		static std::shared_ptr<IpcModule> newIpcModulesFromFiles(std::vector<std::string> &files, bool isMainModule, YamlConfig* config, const ContextConfig* contextConfig, const std::string& output_filename);
 
 		inline void add(std::shared_ptr<IpcModule> module) {
 			modules.push_back(module);
@@ -116,6 +120,8 @@ namespace ipcrewriter {
 					result.push_back(f);
 			return result;
 		}
+
+		const std::vector<std::string> &getLogEntries() override;
 	};
 
 }

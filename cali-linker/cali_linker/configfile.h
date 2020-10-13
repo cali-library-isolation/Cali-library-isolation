@@ -6,6 +6,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <set>
 
 
 class RlimitConfig {
@@ -43,8 +44,18 @@ class ContextConfig {
 public:
 	std::string name;
 	std::vector<std::string> selectors;
+	std::vector<std::string> ignoredFunctions;
 	PermissionConfig permissions;
 	bool instrument = false;
+	bool instrument_coverage = false;
+	std::string instrument_user = "";
+
+	bool mprotect_mode = false;
+	bool sequential_mode = false;
+	bool programIsForking = false;
+	int silent = 0;
+	bool concurrentLibraryCommunication = false;
+	std::map<std::string, std::string> functionBehavior;
 
 	bool matches(std::string filename) const;
 };
@@ -60,11 +71,15 @@ public:
 	bool linkerOverride = false;
 	bool addLibstdcxx = false;
 
+	std::map<std::string, std::vector<std::string>> replaceArguments;
+	std::vector<std::string> ignoreOutputs;
+
 	int limit_subnode_depth = 3;
 	int limit_struct_parts = 32;
 
-	std::map<std::string, int> filedescriptors;
+	std::map<std::string, std::vector<int>> filedescriptors;
 	bool strongFDAnalysis = false;
+	bool strongFPAnalysis = false;
 };
 
 #endif

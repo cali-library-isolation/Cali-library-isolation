@@ -26,7 +26,7 @@ public:
 
 	explicit PDGInstrumentPass(std::set<std::string> &ignored) : ModulePass(ID), ignored(ignored) {}
 
-	bool prepareStubs(llvm::Module &module);
+	void prepareStubs(llvm::Module &module);
 
 	void getAnalysisUsage(llvm::AnalysisUsage &usage) const override;
 

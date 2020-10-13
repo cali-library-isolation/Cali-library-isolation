@@ -9,6 +9,7 @@
 #include "PDGCreationPass.h"
 #include "PDGUtilities.h"
 #include "../cali_linker/debug.h"
+#include "DataDrivenSCCPass.h"
 
 using namespace llvm;
 
@@ -40,14 +41,16 @@ namespace {
 		return false;
 	}
 
-	char isMemorySource(Value *value) {
+	char isMemorySource(Value *value, const std::map<std::string, std::string>& functionBehavior) {
 		if (isa<AllocaInst>(value) || isa<GlobalVariable>(value))
 			return 1;
 		if (isa<CallInst>(value) && cast<CallInst>(value)->getCalledFunction()) {
-			auto name = cast<CallInst>(value)->getCalledFunction()->getName();
-			if (name == "malloc" || name == "calloc")
+			std::string name = cast<CallInst>(value)->getCalledFunction()->getName();
+			auto it = functionBehavior.find(name);
+			if (it != functionBehavior.end()) name = it->second;
+			if (name == "malloc" || name == "calloc" || name == "mmap" || name == "mmap64" || name == "realloc" || name == "getenv" || name == "strdup")
 				return 1;
-			if (name == "posix_memalign")
+			if (name == "posix_memalign" || name == "vasprintf" || name == "asprintf")
 				return 2;
 		}
 		return 0;
@@ -65,16 +68,17 @@ void PDGCreationPass::getAnalysisUsage(llvm::AnalysisUsage &Info) const {
 	Info.setPreservesCFG();
 	Info.setPreservesAll();
 	Info.addRequired<UnifyFunctionExitNodes>();
+	Info.addRequired<DataDrivenSCCPass>();
 }
 
 bool PDGCreationPass::runOnModule(llvm::Module &M) {
 	std::cout << "PDGCreationPass ..." << std::endl;
-	std::cout << "PDG Node = " << sizeof(PDGNode) << "   PDG Edge = " << sizeof(PDGEdge) << std::endl;
 	auto t = time(0);
+	graph.structClusters = &getAnalysis<DataDrivenSCCPass>().getStructClusters();
 
 	// Create trees for global variables and label them as memory source
 	for (auto &global: M.getGlobalList()) {
-		if (!isIgnoredInstruction(&global) && isMemorySource(&global)) {
+		if (!isIgnoredInstruction(&global) && isMemorySource(&global, contextConfig->functionBehavior)) {
 			graph[graph.getVertex(&global)].source = true;
 			graph[graph.getVertex(&global)].source_type = 1;
 		}
@@ -121,16 +125,12 @@ bool PDGCreationPass::runOnModule(llvm::Module &M) {
 				} else {
 					// Default case - general instruction
 					auto v = graph.getVertex(&ins, &function);
-					graph[v].source_type = isMemorySource(&ins);
+					graph[v].source_type = isMemorySource(&ins, contextConfig->functionBehavior);
 					graph[v].source = graph[v].source_type;
 					addEdges(v, &ins);
 				}
 			}
 		}
-	}
-
-	if (config->strongFDAnalysis) {
-		analyzeStructs(M);
 	}
 
 #ifndef SILENT
@@ -140,6 +140,13 @@ bool PDGCreationPass::runOnModule(llvm::Module &M) {
 }
 
 void PDGCreationPass::addEdges(Vertex v, User *instruction) {
+	// First: generate edges for all operators
+	for (auto op = instruction->op_begin(); op != instruction->op_end(); op++) {
+		if (isa<GEPOperator>(op->get()) || isa<BitCastOperator>(op->get())) {
+			addEdges(graph.getVertex(op->get()), cast<User>(op->get()));
+		}
+	}
+	// Next: for the current instruction
 	if (isa<LoadInst>(instruction)) {
 		auto ptr = graph.getVertex(instruction->getOperand(0));
 		//add_edge(getDeref(ptr), v, PDGEdge{.type = PDGEdge::Data}, graph);
@@ -160,20 +167,36 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 		auto ptr = graph.getVertex(instruction->getOperand(1));
 		// add_edge(val, graph.getDeref(ptr), PDGEdge{type: PDGEdge::Data}, graph);
 		graph.addSubnodeEdges(val, graph.getDeref(ptr));
-		if (isa<GEPOperator>(instruction->getOperand(1)) || isa<BitCastOperator>(instruction->getOperand(1))) {
+		/*if (isa<GEPOperator>(instruction->getOperand(1)) || isa<BitCastOperator>(instruction->getOperand(1))) {
 			addEdges(ptr, cast<User>(instruction->getOperand(1)));
 		}
 		if ((!isa<GetElementPtrInst>(instruction->getOperand(0)) && isa<GEPOperator>(instruction->getOperand(0))) ||
 			isa<BitCastOperator>(instruction->getOperand(0))) {
 			addEdges(val, cast<User>(instruction->getOperand(0)));
-		}
+		}*/
 		return;
 	}
 	if (isa<CallInst>(instruction)) {
 		auto *call = cast<CallInst>(instruction);
-		if (isFileDescriptorFunction(getCalledFunction(call))) {
+		auto cf = getCalledFunction(call);
+		int paramNumber;
+		if (isFileDescriptorFunction(cf)) {
 			dbg_llvm_outs << "[FD] Found fd construction: " << *call << "\n";
 			graph[v].filedescriptor = true;
+		} else if ((paramNumber = isFileDescriptorParamFunction(cf)) >= 0) {
+			dbg_llvm_outs << "[FD] Found param number " << paramNumber << " to be fd: " << *call << "\n";
+			auto arg = call->arg_begin();
+			std::advance(arg, paramNumber);
+			if (!isIgnoredOperand(arg->get())) {
+				auto v2 = graph.getVertex(arg->get());
+				graph[v2].filedescriptor = true;
+			}
+		} else if (isFileDescriptorPtrFunction(cf)) {
+			dbg_llvm_outs << "[FD] Found indirect fd construction: " << *call << "\n";
+			auto op = graph.getDerefOpt(graph.getVertex(call->arg_operands().begin()->get()));
+			if (op) {
+				graph[*op].filedescriptor = true;
+			}
 		}
 		// bool isExternal = call->getCalledFunction() && externalSymbols.count(call->getCalledFunction()->getName()) > 0;
 		for (auto &arg: call->arg_operands()) {
@@ -182,6 +205,10 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 				continue;
 			auto v2 = graph.getVertex(arg.get());
 			graph.add_edge(v2, v, PDGEdge{.type = PDGEdge::Param, .index=arg.getOperandNo()});
+		}
+		if (!isa<Function>(call->getCalledValue()) && !isIgnoredOperand(call->getCalledValue())) {
+			auto v2 = graph.getVertex(call->getCalledValue());
+			graph.add_edge(v2, v, PDGEdge{.type=PDGEdge::Invocation, .index=0});
 		}
 		return;
 	}
@@ -194,6 +221,10 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 				continue;
 			auto v2 = graph.getVertex(arg.get());
 			graph.add_edge(v2, v, PDGEdge{.type = PDGEdge::Param, .index=arg.getOperandNo()});
+		}
+		if (!isa<Function>(call->getCalledValue()) && !isIgnoredOperand(call->getCalledValue())) {
+			auto v2 = graph.getVertex(call->getCalledValue());
+			graph.add_edge(v2, v, PDGEdge{.type=PDGEdge::Invocation, .index=0});
 		}
 		return;
 	}
@@ -209,7 +240,12 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 				specialGEPHandling(instruction, *sourceMemVertex);
 
 				Vertex target = *sourceMemVertex;
+				Type* targetType = graph[target].type;
 				for (int i = 2; i < instruction->getNumOperands(); i++) {
+					if (targetType->isArrayTy()) {
+						targetType = targetType->getArrayElementType();
+						continue;
+					}
 					auto op = instruction->getOperand(i);
 					if (isa<ConstantInt>(op)) {
 						unsigned int index = cast<ConstantInt>(op)->getZExtValue();
@@ -217,6 +253,7 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 						if (componentVertex) {
 							// graph.uniteSubnodes(*componentVertex, *memV);
 							target = *componentVertex;
+							targetType = graph[target].type;
 						} else {
 							// graph.uniteSubnodes(sourceVertex, v);
 							break;
@@ -237,9 +274,57 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 		}
 		return;
 	}
-	if (isa<BitCastOperator>(instruction)) {
+	if (isa<BitCastOperator>(instruction) || isa<BitCastInst>(instruction)) {
+		// Check if this is a GEP-style bitcast (struct to [0] or union to any child)
 		auto sourceVertex = graph.getVertex(instruction->getOperand(0));
+		auto sourceType = instruction->getOperand(0)->getType();
+		if (sourceType->isPointerTy() && instruction->getType()->isPointerTy()) {
+			auto sourceMemType = sourceType->getPointerElementType();
+			auto destMemType = instruction->getType()->getPointerElementType();
+			if (sourceMemType->isStructTy() && sourceMemType->getStructNumElements() > 0 && sourceMemType->getStructElementType(0) == destMemType) {
+				// casting a struct ptr to its first member (GEP-style)
+				auto sourceMemVertex = graph.getDerefOpt(sourceVertex);
+				auto memV = graph.getDerefOpt(v);
+				if (sourceMemVertex && memV) {
+					auto structElementVertex = graph.getPartOpt(*sourceMemVertex, 0);
+					if (structElementVertex) {
+						graph.add_edge(sourceVertex, v, PDGEdge{.type= PDGEdge::Data, .index=0});
+						graph.uniteSubnodes(*memV, *structElementVertex);
+						return;
+					}
+				}
+			}
+		}
+
+		// else: unite
 		graph.uniteSubnodes(sourceVertex, v);
+		return;
+	}
+	if (isa<ExtractValueInst>(instruction)) {
+		auto opVertex = graph.getVertex(instruction->getOperand(0));
+		boost::optional<Vertex> v2 = opVertex;
+		for (auto index: cast<ExtractValueInst>(instruction)->indices()) {
+			v2 = graph.getPartOpt(*v2, index);
+			if (!v2) break;
+		}
+		if (v2) {
+			graph.addSubnodeEdges(*v2, v);
+			return;
+		}
+	}
+	if (isa<InsertValueInst>(instruction)) {
+		// Source value / undef
+		graph.addSubnodeEdges(graph.getVertex(instruction->getOperand(0)), v);
+		// The inserted value
+		boost::optional<Vertex> v2 = v;
+		for (auto index: cast<InsertValueInst>(instruction)->indices()) {
+			v2 = graph.getPartOpt(*v2, index);
+			if (!v2) break;
+		}
+		if (v2) {
+			graph.addSubnodeEdges(graph.getVertex(instruction->getOperand(1)), *v2);
+			return;
+		}
 	}
 	/*
 	if (isa<ReturnInst>(instruction)) {
@@ -253,9 +338,6 @@ void PDGCreationPass::addEdges(Vertex v, User *instruction) {
 		if (!isa<BasicBlock>(op->get()) && !isa<Constant>(op->get())) {
 			Vertex v2 = graph.getVertex(op->get());
 			graph.addSubnodeEdges(v2, v);
-			if (isa<GEPOperator>(op->get()) || isa<BitCastOperator>(op->get())) {
-				addEdges(v2, cast<User>(op->get()));
-			}
 		}
 	}
 }
@@ -292,63 +374,3 @@ void PDGCreationPass::specialGEPHandling(llvm::User *ins, Vertex memVertex) {
 }
 
 
-static bool struct_deep_equal(const StructType *st1, const StructType *st2, std::map<const StructType *, int> &equality) {
-	if (st1->getStructNumElements() != st2->getStructNumElements())
-		return false;
-	for (unsigned int i = 0; i < st1->getStructNumElements(); i++) {
-		auto t1 = st1->getStructElementType(i);
-		auto t2 = st2->getStructElementType(i);
-		if (t1 == t2)
-			continue;
-		if (t1->isStructTy() && t2->isStructTy()) {
-			auto eq1 = equality.find((StructType *) t1);
-			auto eq2 = equality.find((StructType *) t2);
-			if (eq1 != equality.end() && eq2 != equality.end() && eq1->second == eq2->second)
-				continue;
-		}
-		return false;
-	}
-	return true;
-}
-
-void PDGCreationPass::analyzeStructs(llvm::Module &M) {
-	std::map<std::string, int> nameToCluster;
-	std::vector<std::set<const StructType *>> clusters;
-	for (const auto st: M.getIdentifiedStructTypes()) {
-		auto str = st->getStructName();
-		str = str.substr(0, str.find_last_not_of(".0123456789") + 1);
-		auto it = nameToCluster.find(str);
-		if (it != nameToCluster.end()) {
-			graph.structClusters[st] = it->second;
-			clusters[it->second].insert(st);
-		} else {
-			clusters.emplace_back();
-			clusters.back().insert(st);
-			graph.structClusters[st] = clusters.size() - 1;
-		}
-	}
-
-	// Post-filter struct equality
-	for (size_t i = 0; i < clusters.size(); i++) {
-		size_t new_cluster_index = 0;
-		const StructType *ref = nullptr;
-		for (const auto st: clusters[i]) {
-			if (ref) {
-				if (!struct_deep_equal(st, ref, graph.structClusters)) {
-					if (!new_cluster_index) {
-						clusters.emplace_back();
-						new_cluster_index = clusters.size() - 1;
-					}
-					clusters[new_cluster_index].insert(st);
-				}
-			} else {
-				ref = st;
-			}
-		}
-		if (new_cluster_index) {
-			for (const auto st: clusters[new_cluster_index]) {
-				graph.structClusters[st] = new_cluster_index;
-			}
-		}
-	}
-}

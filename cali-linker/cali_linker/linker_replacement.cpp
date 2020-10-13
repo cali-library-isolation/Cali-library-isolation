@@ -32,11 +32,11 @@ public:
 	LibraryContext(YamlConfig *globalConfig, const ContextConfig *config) : globalConfig(globalConfig), config(config) {}
 
 
-	std::shared_ptr<IpcModule> get_module() {
+	std::shared_ptr<IpcModule> get_module(const std::string& output_filename) {
 		// TODO
 		if (!module) {
 			// module = IpcModule::newIpcModuleFromFile(get_single_file(), is_main_module, false);
-			module = CompositeIpcModule::newIpcModulesFromFiles(files, is_main_module, globalConfig, config);
+			module = CompositeIpcModule::newIpcModulesFromFiles(files, is_main_module, globalConfig, config, output_filename);
 		}
 		return module;
 	}
@@ -71,6 +71,8 @@ class LinkerArguments {
 	map<int, std::shared_ptr<LibraryContext>> argumentUsage;
 	vector<std::shared_ptr<LibraryContext>> libraries;
 	YamlConfig config;
+	std::string output_filename;
+	bool is_shared_library = false;
 
 public:
 
@@ -85,34 +87,57 @@ public:
 		}
 		dbg_cerr << "\n\n" << std::endl;
 
+		// Find config file
 		string configfile = "config.yaml";
-		bool skipNext = false;
 		for (const auto &s: arguments) {
-			if (skipNext) {
-				skipNext = false;
-			} else if (startsWith(s, "-L")) {
-				librarySearchpath.push_back(s.substr(2));
-			} else if (s == "-o" || s == "-plugin" || s == "-rpath") {
-				skipNext = true;
-			} else if (startsWith(s, "--cali-config=")) {
+			if (startsWith(s, "--cali-config=")) {
 				configfile = s.substr(14);
 			} else if (startsWith(s, "--ipc-config=")) {
 				configfile = s.substr(13);
 			}
 		}
-
 		if (configfile[0] != '/' && !filesystem::exists(configfile)) {
 			configfile = applicationPath.parent_path().parent_path().append("cali-linker").append("sample_configs").append(configfile).string();
 		}
 		config = YamlConfig::fromFile(configfile);
+		modifyArguments();
 
-		removeIpcLinkerArguments();
+		// Parse other commandline arguments
+		bool skipNext = false;
+		bool nextOutput = false;
+		for (const auto &s: arguments) {
+			if (skipNext) {
+				skipNext = false;
+			} else if (nextOutput) {
+				output_filename = s;
+				nextOutput = false;
+			} else if (startsWith(s, "-L")) {
+				librarySearchpath.push_back(s.substr(2));
+			} else if (s == "-o") {
+				nextOutput = true;
+			} else if (s == "-plugin" || s == "-rpath") {
+				skipNext = true;
+			} else if (s == "-shared") {
+				is_shared_library = true;
+			}
+		}
 	}
 
-	void removeIpcLinkerArguments() {
+	void modifyArguments() {
 		for (ssize_t i = arguments.size() - 1; i >= 0; i--) {
 			if (startsWith(arguments[i], "--ipc-config=") || startsWith(arguments[i], "--cali-config=")) {
 				arguments.erase(arguments.begin() + i);
+			}
+			auto it = config.replaceArguments.find(arguments[i]);
+			if (it != config.replaceArguments.end()) {
+				if (it->second.empty()) {
+					arguments.erase(arguments.begin() + i);
+				} else {
+					arguments[i] = it->second[0];
+					for (size_t j = 1; j < it->second.size(); j++) {
+						arguments.insert(arguments.begin()+(i+j), it->second[j]);
+					}
+				}
 			}
 		}
 	}
@@ -131,8 +156,8 @@ public:
 							// existing library context
 							? it->second
 							// new library context
-							: (libraries.push_back(known_libs[item.second.name] = make_shared<LibraryContext>(&config, &item.second)), libraries[
-									libraries.size() - 1]);
+							: (libraries.push_back(known_libs[item.second.name] = make_shared<LibraryContext>(&config, &item.second)),
+									libraries[libraries.size() - 1]);
 					if (std::find(library_context->files.begin(), library_context->files.end(), filename) == library_context->files.end())
 						library_context->files.push_back(filename);
 					if (i >= 0)
@@ -144,7 +169,11 @@ public:
 
 		for (size_t i = 0; i < arguments.size(); i++) {
 			const auto &s = arguments[i];
-			if (config.addLibstdcxx && s == "-lstdc++") {
+			if (endsWith(s, ".la")) {
+				if (replace_libtool_in_arguments(s, i)) {
+					i--;
+				}
+			} else if (config.addLibstdcxx && s == "-lstdc++") {
 				add_file_to_library_list(applicationPath.parent_path().append("libstdc++.bc").string(), -1);
 				cerr << "Add libstdc++.bc" << endl;
 			} else if (startsWith(s, "-l") || endsWith(s, ".so") || endsWith(s, ".a")) {
@@ -167,13 +196,71 @@ public:
 		}
 	}
 
+	/**
+	 *
+	 * @param libtoolFile
+	 * @param argNumber
+	 * @return true if the libtool file has been replaced by other arguments
+	 */
+	bool replace_libtool_in_arguments(const std::string &libtoolFile, int argNumber) {
+		std::ifstream f(libtoolFile);
+		std::string line;
+		std::string library;
+		std::vector<std::string> additionalFlags;
+
+		auto addFlags = [](const std::string &text, std::vector<std::string> &additionalFlags) {
+			size_t last = 0;
+			size_t next = 0;
+			while ((next = text.find(' ', last)) != string::npos) {
+				if (next - last > 1) {
+					auto s = text.substr(last, next - last);
+					if (s != "-pthread")
+						additionalFlags.push_back(s);
+				}
+				last = next + 1;
+			}
+			if (text.size() - last > 1) {
+				auto s = text.substr(last);
+				if (s != "-pthread")
+					additionalFlags.push_back(s);
+			}
+		};
+
+		while (std::getline(f, line)) {
+			if (startsWith(line, "old_library='")) {
+				library = line.substr(13, line.size() - 14);
+				auto p = libtoolFile.find_last_of('/');
+				if (p != std::string::npos && library[0] != '/') {
+					library = libtoolFile.substr(0, p + 1) + ".libs/" + library;
+				}
+			} else if (startsWith(line, "inherited_linker_flags='")) {
+				addFlags(line.substr(24, line.size() - 25), additionalFlags);
+			} else if (startsWith(line, "dependency_libs='")) {
+				addFlags(line.substr(17, line.size() - 18), additionalFlags);
+			}
+		}
+
+		arguments[argNumber] = library;
+		arguments.insert(arguments.begin() + argNumber + 1, additionalFlags.begin(), additionalFlags.end());
+		/*std::cerr << "PATCHED " << libtoolFile << " at " << argNumber << " : \n";
+		for (auto &s: arguments) std::cerr << s << " ";
+		std::cerr << std::endl;*/
+		return true;
+	}
+
 	void link() {
+		// if this output should not be processed - delegate to the real linker now
+		if (std::find(config.ignoreOutputs.begin(), config.ignoreOutputs.end(), output_filename) != config.ignoreOutputs.end()) {
+			execute_real_linker();
+			return;
+		}
+
 		build_libraries();
 
 		dbg_cout << libraries.size() << " library contexts." << endl;
 		for (const auto &l: libraries) l->print();
 
-		if (instrumentation_required()) {
+		if (changesRequired()) {
 			prepare_ipc();
 		}
 
@@ -201,8 +288,8 @@ public:
 		return {};
 	}
 
-	bool instrumentation_required() {
-		return libraries.size() >= 2;
+	bool changesRequired() {
+		return libraries.size() >= 2 && !is_shared_library;
 	}
 
 	void prepare_ipc() {
@@ -222,20 +309,27 @@ public:
 
 		IpcRewriter ipcRewriter;
 		const ContextConfig *contextConfig = nullptr;
+		auto p = output_filename.rfind('/');
+		auto output_name = p == string::npos ? output_filename : output_filename.substr(p+1);
 		for (const auto &lib: libraries) {
-			ipcRewriter.addModule(lib->get_module());
+			ipcRewriter.addModule(lib->get_module(output_name));
 			if (!lib->is_main_module)
 				contextConfig = lib->config;
 		}
 
 		ipcRewriter.createIpcJail(contextConfig, &config);
 		ipcRewriter.saveAllModules(filesystem::current_path().string());
+		ipcRewriter.saveLogEntries(output_filename + ".log");
 
 		for (const auto &lib: libraries) {
 			if (lib->is_main_module) {
 				for (const auto &arg: libipc_args) {
 					if (lib->config->instrument) {
 						lib->rewritten_args.push_back(replaceAll(arg, "libipc.a", "libipc-instrument.a"));
+					} else if (lib->config->mprotect_mode) {
+						lib->rewritten_args.push_back(replaceAll(arg, "libipc.a", "libipc-mprotect.a"));
+					} else if (lib->config->sequential_mode) {
+						lib->rewritten_args.push_back(replaceAll(arg, "libipc.a", "libipc-sequential.a"));
 					} else {
 						lib->rewritten_args.push_back(arg);
 					}
@@ -266,7 +360,7 @@ public:
 	}
 
 	void execute_real_linker() {
-		auto arg2 = instrumentation_required() ? build_linker_argument_list() : arguments;
+		auto arg2 = changesRequired() ? build_linker_argument_list() : arguments;
 
 		// new thing: ld <args> nullptr (as char* array)
 		std::vector<char *> argv(arg2.size() + 2);
@@ -288,9 +382,27 @@ public:
 
 };
 
+void print_cmdline(int argc, const char *argv[]) {
+	std::cerr << "----- CALI INVOCATION: -----\n";
+	for (int i = 0; i < argc; i++) {
+		if (i != 0) std::cerr << " ";
+		std::string s(argv[i]);
+		if (s.find(' ') != s.npos) std::cerr << "\"" << s << "\"";
+		else std::cerr << s;
+	}
+	std::cerr << "\nWorkdir: " << filesystem::current_path().string();
+	std::cerr << "\n----- END CALI INVOCATION -----" << std::endl;
+}
+
 int main(int argc, const char *argv[]) {
-	applicationPath = filesystem::absolute(argv[0]).parent_path();
+	print_cmdline(argc, argv);
+	applicationPath = filesystem::absolute(argv[0]);
+	while (filesystem::is_symlink(applicationPath)) {
+		applicationPath = filesystem::read_symlink(applicationPath);
+	}
+	applicationPath = applicationPath.parent_path();
 
 	auto linker = LinkerArguments(argc, argv);
 	linker.link();
+	return 0;
 }

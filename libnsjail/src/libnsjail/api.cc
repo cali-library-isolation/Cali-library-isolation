@@ -92,15 +92,23 @@ static void nsjail_addMount(struct nsjconf_t *conf, const char *path, int flags,
 					*sep = 0;
 					// mount
 					pos = splitParameter(pos);
-					if (pos[0] != '-')
-						nsjail_addMountSimple(conf, realpath(pos, 0), flags, fs_type);
+					if (pos[0] != '-') {
+						auto final_path = realpath(pos, nullptr);
+						if (final_path)
+							nsjail_addMountSimple(conf, final_path, flags, fs_type);
+						free(final_path);
+					}
 					pos = sep + 1;
 					sep = strchr(pos, ',');
 				}
 				// mount
 				pos = splitParameter(pos);
-				if (pos[0] != '-')
-					nsjail_addMountSimple(conf, realpath(pos, 0), flags, fs_type);
+				if (pos[0] != '-') {
+					auto final_path = realpath(pos, nullptr);
+					if (final_path)
+						nsjail_addMountSimple(conf, final_path, flags, fs_type);
+					free(final_path);
+				}
 				free(arg);
 			}
 		} else if (strcmp(path, "$ARGV_FOLDERS") == 0) {
@@ -126,8 +134,13 @@ static void nsjail_addMount(struct nsjconf_t *conf, const char *path, int flags,
 			}
 		} else if (strncmp("$HOME", path, strlen("$HOME")) == 0) {
 			char *home = getenv("HOME");
-			auto newpath = home + std::string(path).substr(4);
+			auto newpath = home + std::string(path).substr(5);
 			nsjail_addMountSimple(conf, newpath, flags, fs_type);
+		} else if (strncmp("$CWD", path, strlen("$CWD")) == 0) {
+			char *cwd = getcwd(nullptr, 0);
+			auto newpath = cwd + std::string(path).substr(4);
+			nsjail_addMountSimple(conf, newpath, flags, fs_type);
+			free(cwd);
 		} else {
 			debug_printf("[nsjail] Error: unknown path \"%s\"", path);
 		}

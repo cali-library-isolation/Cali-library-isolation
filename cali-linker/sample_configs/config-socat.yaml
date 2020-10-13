@@ -4,10 +4,14 @@ writeGraphs: false
 writeGraphsDot: false
 linkerOverride: true
 strongFDAnalysis: true
+strongFPAnalysis: true
 
 contexts:
   main:
     instrument: false
+    #instrumentUser: socat
+    #instrumentCoverage: true
+    #mprotect_mode: true
     selectors:
       - "*.o"
       - "libxio.a"
@@ -20,6 +24,7 @@ contexts:
         - /dev/random
         - /dev/urandom
         - "$ARGV"
+        - "$CWD"
       readwrite:
         - /tmp
       #user: 65534 # = nobody

@@ -437,7 +437,8 @@ static bool initNsInternal(nsjconf_t* nsjconf) {
 		}
 	}
 
-	if (chdir(nsjconf->cwd.c_str()) == -1) {
+	if (!nsjconf->cwd.empty() && chdir(nsjconf->cwd.c_str()) == -1) {
+		if (errno == EEXIST) return true; // directory not found because not shared
 		PLOG_E("chdir('%s')", nsjconf->cwd.c_str());
 		return false;
 	}

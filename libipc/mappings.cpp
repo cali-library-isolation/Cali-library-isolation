@@ -47,7 +47,7 @@ extern char __start_data asm ("__data_start");
 
 void remap_shared(void *addr, size_t len, int permissions) {
 	void *(*my_mmap)(void *addr, size_t length, int prot, int flags, int fd, off_t offset) = real(mmap);
-	debug_printf("Sharing %p - %p (%ld bytes)\n", addr, (void *) (len + (char *) addr), len);
+	debug_printf("Sharing %p - %p (%ld bytes)", addr, (void *) (len + (char *) addr), len);
 	// move to tmp storage
 	void *tmp = my_mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	memcpy(tmp, addr, len);
@@ -163,7 +163,7 @@ void remap_library_segments() {
 	remap_shared((void *) ptr, 0x2000);*/
 	// TODO find_mappings();
 
-	debug_printf("shm-data ptr: %p - %p ( - %p)\n", &__start_shm_data, &__last_shm_data_variable, &__stop_shm_data);
+	debug_printf("shm-data ptr: %p - %p ( - %p)", &__start_shm_data, &__last_shm_data_variable, &__stop_shm_data);
 	if (&__last_shm_data_variable < &__stop_shm_data-1)
 		throw runtime_error("__last_shm_data_variable is not the last symbol in the shared memory section");
 
@@ -179,7 +179,7 @@ void remap_library_segments() {
 		remap_data_shared((void *) shm_data_page, size, PROT_READ + PROT_WRITE);
 		// print_mapping();
 	} else {
-		debug_printf("... no global data to be shared.\n");
+		debug_printf("... no global data to be shared.");
 	}
 }
 
@@ -194,7 +194,7 @@ void *get_new_stack() {
 }
 
 void unmap_stack(void *sp) {
-	debug_printf("Unmapping %p...\n", sp);
+	debug_printf("Unmapping %p...", sp);
 	size_t len = 144 * 1024;
 	if (munmap((void *) (page(sp) - len), len + 0x8000) != 0)
 		perror("munmap(stack)");
@@ -203,5 +203,6 @@ void unmap_stack(void *sp) {
 void print_mapping(void) {
 	// Print memory layout after fork
 	std::string cmd = "pmap " + std::to_string(getpid());
-	system(cmd.c_str());
+	if (system(cmd.c_str()))
+		perror("pmap");
 }

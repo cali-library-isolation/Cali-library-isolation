@@ -14,6 +14,7 @@
 #include "../cali_linker/archive-wrapper.h"
 #include "../cali_linker/debug.h"
 #include "../cali_linker/linker_replacement.h"
+#include "../cali_linker/randomness.h"
 
 
 namespace ipcrewriter {
@@ -42,13 +43,18 @@ namespace ipcrewriter {
 		return source;
 	}
 
+	const std::vector<std::string> &IpcModule::getLogEntries() {
+		return logEntries;
+	}
+
 
 
 
 	static int linked_things = 0;
 
 	std::shared_ptr<IpcModule>
-	CompositeIpcModule::newIpcModulesFromFiles(std::vector<std::string> &files, bool isMainModule, YamlConfig *config, const ContextConfig *contextConfig) {
+	CompositeIpcModule::newIpcModulesFromFiles(std::vector<std::string> &files, bool isMainModule, YamlConfig *config, const ContextConfig *contextConfig,
+											   const std::string &output_filename) {
 		std::vector<std::shared_ptr<IpcModule>> binary_modules;
 		std::set<std::string> seen_files;
 		std::set<std::string> ignored;
@@ -60,7 +66,7 @@ namespace ipcrewriter {
 		stubsFilename.append("libc-stubs.bc");
 		llvm::SMDiagnostic error;
 		auto composite_module = parseIRFile(stubsFilename.string(), error, LlvmIpcModule::context);
-		composite_module->setModuleIdentifier("llvm-linked-things_" + std::to_string(linked_things++) + ".bc");
+		composite_module->setModuleIdentifier("llvm-linked-things_" + output_filename + "_" + std::to_string(linked_things++) + '-' + getRandomString() + ".bc");
 
 		// Prepare linker
 		llvm::Linker L(*composite_module);
@@ -82,6 +88,7 @@ namespace ipcrewriter {
 			}
 			// Check if file has already been loaded
 			if (!seen_files.insert(absolute(filename)).second) {
+				std::cerr << "Already seen: " << filename << std::endl;
 				continue;
 			}
 
@@ -137,7 +144,7 @@ namespace ipcrewriter {
 							addLlvmModule(std::move(m));
 						} else if (buffer.substr(0, 4) == "\x7f""ELF") {
 							if (!binary_added) {
-								binary_modules.push_back(std::shared_ptr<IpcModule>(new BinaryIpcModule(filename, isMainModule, config, contextConfig)));
+								binary_modules.push_back(std::shared_ptr<IpcModule>(new BinaryIpcModule(filename, isMainModule, config, contextConfig, true)));
 								binary_added = true;
 							}
 						} else {
@@ -172,4 +179,14 @@ namespace ipcrewriter {
 
 	CompositeIpcModule::CompositeIpcModule(bool isMainModule, YamlConfig *config, const ContextConfig *contextConfig)
 			: IpcModule("", isMainModule, config, contextConfig) {}
+
+
+	const std::vector<std::string> &CompositeIpcModule::getLogEntries() {
+		logEntries.clear();
+		for (auto &m: modules) {
+			for (auto &s: m->getLogEntries())
+				logEntries.push_back(s);
+		}
+		return logEntries;
+	}
 }

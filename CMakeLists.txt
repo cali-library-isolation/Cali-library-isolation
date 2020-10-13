@@ -4,6 +4,11 @@ project(Cali)
 add_subdirectory(cali-linker)
 add_subdirectory(libipc)
 add_subdirectory(libnsjail)
+add_subdirectory(instrumentations)
+add_dependencies(cali ipc)
+add_dependencies(cali ipc-mprotect)
+add_dependencies(cali ipc-sequential)
+add_dependencies(cali nsjail)
 
 
 # copy precompiled libraries

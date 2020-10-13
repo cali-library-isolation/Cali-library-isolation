@@ -7,6 +7,9 @@ addLibstdc++: true
 contexts:
   main:
     instrument: false
+    #instrumentUser: filezilla
+    #instrumentCoverage: true
+    #mprotect_mode: true
     selectors:
       - "*.o"
       - "*.bc"
@@ -28,6 +31,7 @@ contexts:
         #- /usr
         #- /etc
         #- /dev/urandom
+        - "$CWD"
       readwrite:
         #- "/"
         - "$HOME/.config/filezilla"

@@ -32,8 +32,8 @@ size_t calculateSinkReachability(PDG &graph, std::set<Function *> &functions, ba
 	//auto t = std::chrono::high_resolution_clock::now().time_since_epoch();
 	for (auto f: functions) {
 		for (auto v: graph.getVerticesForFunction(f)) {
-			if (graph[v].function != f)
-				throw std::runtime_error("Error in function vertex index");
+			if (graph[v].function != f) continue;
+				// throw std::runtime_error("Error in function vertex index");
 			if ((graph[v].ipcsink || graph[v].reaches_ipc_sink))
 				sources.push_back(v);
 		}
@@ -70,6 +70,11 @@ size_t calculateFDReachability(PDG &graph, std::set<Function *> &functions, base
 		}
 
 		bool discover_vertex(Vertex v, PDG &graph) {
+			if (graph[v].instruction && isa<BinaryOperator>(graph[v].instruction)) {
+				auto op = cast<BinaryOperator>(graph[v].instruction);
+				if (op->getOpcode() == llvm::Instruction::Add || op->getOpcode() == llvm::Instruction::Sub)
+					return false;
+			}
 			if (isFileDescriptorType(graph[v].type)) {
 				graph[v].filedescriptor = true;
 				// TODO UGLY
@@ -86,8 +91,8 @@ size_t calculateFDReachability(PDG &graph, std::set<Function *> &functions, base
 		for (auto v: graph.vertex_set()) {
 			// Struct-based heuristics
 			if (graph[v].type && graph[v].type->isStructTy()) {
-				auto cluster = graph.structClusters.find((const StructType *) graph[v].type);
-				if (cluster != graph.structClusters.end()) {
+				auto cluster = graph.structClusters->find((const StructType *) graph[v].type);
+				if (cluster != graph.structClusters->end()) {
 					auto fdParams = graph.structClusterToKnownFDFields.find(cluster->second);
 					if (fdParams != graph.structClusterToKnownFDFields.end()) {
 						for (auto index: fdParams->second) {
@@ -104,8 +109,8 @@ size_t calculateFDReachability(PDG &graph, std::set<Function *> &functions, base
 	// Default propagation
 	for (auto f: functions) {
 		for (auto v: graph.getVerticesForFunction(f)) {
-			if (graph[v].function != f)
-				throw std::runtime_error("Error in function vertex index");
+			if (graph[v].function != f) continue;
+				// throw std::runtime_error("Error in function vertex index");
 			if (graph[v].filedescriptor)
 				sources.push_back(v);
 		}
@@ -118,5 +123,40 @@ bool isFileDescriptorFunction(llvm::Function *function) {
 	if (!function)
 		return false;
 	auto name = function->getName();
-	return name == "open" || name == "openat" || name == "socket";
+	return name == "open" || name == "openat" || name == "socket" || name == "dup";
+}
+
+int isFileDescriptorParamFunction(llvm::Function *function) {
+	if (!function)
+		return -1;
+	auto name = function->getName();
+	if (name == "close" || name == "read" || name == "write" || name == "fstat" || name == "dup") return 0;
+	if (name == "__fxstat") return 1;
+	return -1;
+}
+
+bool isFileDescriptorPtrFunction(llvm::Function *function) {
+	if (!function)
+		return false;
+	auto name = function->getName();
+	return name == "pipe";
+}
+
+void markAsPointerToShared(PDG& graph, Vertex v) {
+	for (const auto &e: graph.out_edges(v)) {
+		if (graph[e].type == PDGEdge::Deref)
+			markAsShared(graph, e.target);
+		else if (graph[e].type == PDGEdge::Part)
+			markAsPointerToShared(graph, e.target);
+	}
+}
+
+void markAsShared(PDG& graph, Vertex v) {
+	if (!graph[v].ipcsink) {
+		graph[v].ipcsink = true;
+		for (const auto &e: graph.out_edges(v)) {
+			if (graph[e].type == PDGEdge::Deref || graph[e].type == PDGEdge::Part)
+				markAsShared(graph, e.target);
+		}
+	}
 }

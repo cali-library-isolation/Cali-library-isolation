@@ -32,14 +32,14 @@ include_directories(LibArchive_INCLUDE_DIRS)
 
 
 # configure clang's sanitizers (build with -DCMAKE_BUILD_TYPE=addrsanitizer / memsanitizer)
-SET(CMAKE_C_FLAGS_ADDRSANITIZER "-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
-SET(CMAKE_CXX_FLAGS_ADDRSANITIZER "-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
-SET(CMAKE_C_FLAGS_MEMSANITIZER "-fsanitize=memory -fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
-SET(CMAKE_CXX_FLAGS_MEMSANITIZER "-fsanitize=memory -fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
+SET(CMAKE_C_FLAGS_ADDRSANITIZER "-fsanitize=address -fsanitize-address-use-after-scope -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
+SET(CMAKE_CXX_FLAGS_ADDRSANITIZER "-fsanitize=address -fsanitize-address-use-after-scope -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
+SET(CMAKE_C_FLAGS_MEMSANITIZER "-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize-memory-track-origins -O1 -g")
+SET(CMAKE_CXX_FLAGS_MEMSANITIZER "-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize-memory-track-origins -O1 -g")
 IF ("${CMAKE_BUILD_TYPE}" STREQUAL "addrsanitizer" OR "${CMAKE_BUILD_TYPE}" STREQUAL "memsanitizer")
 	message("--- SANITIZER BUILD CONFIGURED ---")
-	set(CMAKE_C_COMPILER clang)
-	set(CMAKE_CXX_COMPILER clang++)
+	set(CMAKE_C_COMPILER clang-9)
+	set(CMAKE_CXX_COMPILER clang++-9)
 ENDIF ()
 
 
@@ -89,6 +89,8 @@ set(SOURCE_FILES
 		passes/PDGWriterPass.cpp
 		passes/PDGWriterPass.h
 		stdlib-is-shit.h
+		cali_linker/randomness.cpp
+		cali_linker/randomness.h
 		)
 set(SOURCE_FILES_CALI
 		cali_linker/linker_replacement.cpp

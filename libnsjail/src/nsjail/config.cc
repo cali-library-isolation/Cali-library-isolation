@@ -37,7 +37,7 @@
 
 #include "caps.h"
 #include "cmdline.h"
-#include "config.pb.h"
+//#include "config.pb.h"
 #include "logs.h"
 #include "macros.h"
 #include "mnt.h"
@@ -46,6 +46,7 @@
 
 namespace config {
 
+	/*
 static uint64_t configRLimit(
     int res, const nsjail::RLimit& rl, const uint64_t val, unsigned long mul = 1UL) {
 	if (rl == nsjail::RLimit::VALUE) {
@@ -188,13 +189,13 @@ static bool configParseInternal(nsjconf_t* nsjconf, const nsjail::NsJailConfig& 
 
 	for (ssize_t i = 0; i < njc.uidmap_size(); i++) {
 		if (!user::parseId(nsjconf, njc.uidmap(i).inside_id(), njc.uidmap(i).outside_id(),
-			njc.uidmap(i).count(), false /* is_gid */, njc.uidmap(i).use_newidmap())) {
+			njc.uidmap(i).count(), false, njc.uidmap(i).use_newidmap())) {
 			return false;
 		}
 	}
 	for (ssize_t i = 0; i < njc.gidmap_size(); i++) {
 		if (!user::parseId(nsjconf, njc.gidmap(i).inside_id(), njc.gidmap(i).outside_id(),
-			njc.gidmap(i).count(), true /* is_gid */, njc.gidmap(i).use_newidmap())) {
+			njc.gidmap(i).count(), true, njc.gidmap(i).use_newidmap())) {
 			return false;
 		}
 	}
@@ -285,6 +286,7 @@ static bool configParseInternal(nsjconf_t* nsjconf, const nsjail::NsJailConfig& 
 
 	return true;
 }
+*/
 
 /*
 static void LogHandler(

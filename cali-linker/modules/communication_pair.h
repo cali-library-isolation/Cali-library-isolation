@@ -50,12 +50,15 @@ namespace ipcrewriter {
 	class CommunicationPair {
 		friend IpcCallHandlerFunction;
 	protected:
+		bool concurrentLibraryCommunication;
+		std::vector<std::string> logEntries;
 		static int next_id;
 		int id;
 		unsigned int next_code;
 		IpcModule *module1;
 		IpcModule *module2;
 		llvm::StructType *basicCommMemType;
+		static constexpr int basicCommMemTypeIdxData = 3;
 		std::unique_ptr<llvm::Module> module;
 		IpcCallHandlerFunction processIpcCall1;
 		IpcCallHandlerFunction processIpcCall2;
@@ -63,8 +66,10 @@ namespace ipcrewriter {
 		llvm::Function *wrapIncomingCallback;
 		llvm::Function *wrapOutgoingVaList;
 		llvm::Function *wrapPointerFromCallback;
+		llvm::Function *unwrapPointerFromCallback;
 		llvm::Function *nsjailConfigure;
 		llvm::Function *ipcShareFD;
+		llvm::Function *ipcLockSending;
 
 		// shm_malloc.h and other libraries
 		llvm::Type *i8PtrType;
@@ -80,7 +85,9 @@ namespace ipcrewriter {
 		std::unordered_map<llvm::Type *, llvm::Function *> callbackTypeHandlers;
 		std::unordered_map<llvm::Type *, llvm::Function *> callbackTypeReplacements;
 
-		const std::map<std::string, int> *fileDescriptorPolicy = nullptr;
+		std::set<std::string> userInstrumentedFunctions;
+
+		const std::map<std::string, std::vector<int>> *fileDescriptorPolicy = nullptr;
 
 		void initModule(llvm::LLVMContext &context);
 
@@ -110,9 +117,11 @@ namespace ipcrewriter {
 		llvm::Value *generateNonConstantString(const std::string &data, llvm::IRBuilder<> &builder);
 
 	public:
-		CommunicationPair(IpcModule *module1, IpcModule *m2);
+		CommunicationPair(IpcModule *module1, IpcModule *m2, bool concurrentLibraryCommunication);
 
 		~CommunicationPair();
+
+		void initModule();
 
 		int getId() const;
 
@@ -121,12 +130,19 @@ namespace ipcrewriter {
 
 		void setNsjailConfig(const PermissionConfig *permissions);
 
-		inline void setFileDescriptorPolicy(const std::map<std::string, int> *fileDescriptorPolicy) {
+		void loadUserInstrumentation(const std::string& name);
+
+		inline void setFileDescriptorPolicy(const std::map<std::string, std::vector<int>> *fileDescriptorPolicy) {
 			this->fileDescriptorPolicy = fileDescriptorPolicy;
 		}
 
 		void save(const std::string &filename);
 
+		inline const std::vector<std::string> &getLogEntries() const {
+			return logEntries;
+		}
+
+		std::vector<std::string> newArguments;
 	};
 
 }

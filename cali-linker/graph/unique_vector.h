@@ -6,15 +6,15 @@
 namespace basegraph {
 
 	// Unique vector - a set implementation based on vectors (more space-efficient, fast enough for small sets)
-	template<typename _Tp>
+	template<typename Tp>
 	class unique_vector {
 	public:
-		typedef typename std::vector<_Tp>::size_type size_type;
-		typedef typename std::vector<_Tp>::iterator iterator;
-		typedef typename std::vector<_Tp>::const_iterator const_iterator;
-		std::vector<_Tp> vec;
+		typedef typename std::vector<Tp>::size_type size_type;
+		typedef typename std::vector<Tp>::iterator iterator;
+		typedef typename std::vector<Tp>::const_iterator const_iterator;
+		std::vector<Tp> vec;
 
-		void push_back(const _Tp &x) {
+		void push_back(const Tp &x) {
 			insert(x);
 		}
 
@@ -23,7 +23,7 @@ namespace basegraph {
 		 * @param x
 		 * @return true iff the edge did not exist before
 		 */
-		bool insert(const _Tp &x) {
+		bool insert(const Tp &x) {
 			for (auto it = vec.begin(); it != vec.end(); it++)
 				if (x == *it)
 					return false;
@@ -31,7 +31,7 @@ namespace basegraph {
 			return true;
 		}
 
-		bool insert_unique(const _Tp &x) {
+		bool insert_unique(const Tp &x) {
 			vec.push_back(x);
 			return true;
 		}
@@ -42,18 +42,19 @@ namespace basegraph {
 
 		iterator end() { return vec.end(); }
 
-		void remove(const _Tp &x) {
+		bool remove(const Tp &x) {
 			for (auto it = vec.begin(); it != vec.end(); ++it) {
 				if (*it == x) {
 					vec.erase(it);
-					return;
+					return true;
 				}
 			}
+			return false;
 		}
 
 		void clear() { vec.clear(); }
 
-		inline _Tp &operator[](size_t index) {
+		inline Tp &operator[](size_t index) {
 			return vec[index];
 		}
 	};

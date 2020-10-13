@@ -27,7 +27,7 @@ size_t calculateFDReachability(PDG &graph, std::set<llvm::Function *> &functions
 
 
 inline bool isIgnoredOperand(llvm::Value *value) {
-	return llvm::isa<llvm::ConstantData>(value)/*|| llvm::isa<llvm::ConstantPointerNull>(value)*/;
+	return !value || llvm::isa<llvm::ConstantData>(value)/*|| llvm::isa<llvm::ConstantPointerNull>(value)*/;
 }
 
 template<class InstTy>
@@ -53,6 +53,10 @@ inline llvm::Function *getCalledFunction(llvm::CallBase<InstTy> *call) {
 
 bool isFileDescriptorFunction(llvm::Function *function);
 
+int isFileDescriptorParamFunction(llvm::Function *function);
+
+bool isFileDescriptorPtrFunction(llvm::Function *function);
+
 inline bool isFileDescriptorType(llvm::Type *type) {
 	return type && type->isIntegerTy() && type->getIntegerBitWidth() >= 16;
 }
@@ -71,5 +75,8 @@ inline std::vector<InstTy *> getCallsToFunction(llvm::User *function) {
 	}
 	return result;
 }
+
+void markAsPointerToShared(PDG& graph, Vertex v);
+void markAsShared(PDG& graph, Vertex v);
 
 #endif //LLVMREWRITER_PDGUTILITIES_H

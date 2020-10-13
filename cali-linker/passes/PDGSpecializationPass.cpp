@@ -77,8 +77,13 @@ bool PDGSpecializationPass::runOnModule(Module &M) {
 
 	// Remove functions if not used (anymore?)
 	for (auto &funcpair: all_old_to_new) {
-		if (removeIfDead(funcpair.second))count_removed_new++;
-		else if (removeIfDead(funcpair.first))count_removed_old++;
+		if (removeIfDead(funcpair.second)) {
+			count_removed_new++;
+			pdg->removeFunction(funcpair.second);
+		} else if (removeIfDead(funcpair.first)) {
+			count_removed_old++;
+			pdg->removeFunction(funcpair.first);
+		}
 	}
 
 	outs() << "Specialization finished. " << count_scc << " / " << SCCs.size() << " SCCs have been specialized ("
@@ -91,13 +96,21 @@ bool PDGSpecializationPass::runOnModule(Module &M) {
 
 template<class InstTy>
 static inline bool instructionRequiresSpecialization(PDG *pdg, InstTy *ins, Function *function) {
-	if (getCalledFunction(ins) != function)
+	if (getCalledFunction(ins) != function) {
+		// Check if this function is a callback parameter to a library function
+		auto f2 = getCalledFunction(ins);
+		if (!f2) return false;
+		auto v = pdg->getVertexOpt(f2);
+		if (v && (*pdg)[*v].ipcfunction){
+			return function->getReturnType()->isPointerTy();
+		}
 		return false;
+	}
 	// This is a normal call to a function from our SCC
 	// Check for tainted output!
-	auto ref = pdg->getDerefOpt(pdg->getVertex(ins));
-	if (ref && (*pdg)[*ref].reaches_ipc_sink)
-		return true; // "return malloc()"
+	/*auto ref = pdg->getDerefOpt(pdg->getVertex(ins));
+	if (ref && ((*pdg)[*ref].reaches_ipc_sink || (*pdg)[*ref].ipcsink))
+		return true; // "return malloc()"*/
 
 	std::set<Vertex> visited;
 	std::function<bool(Vertex, int)> isShared = [pdg, &isShared, &visited](Vertex v, int limit) {
@@ -115,11 +128,46 @@ static inline bool instructionRequiresSpecialization(PDG *pdg, InstTy *ins, Func
 		return false;
 	};
 
+	// "return malloc()"
+	if (isShared(pdg->getVertex(ins), -1))
+		return true;
+
 	for (unsigned int i = 0; i < ins->getNumArgOperands(); i++) {
 		auto v = pdg->getVertex(ins->getArgOperand(i));
 		visited.clear();
 		if (isShared(v, -2)) {
 			return true; // *arg = malloc()
+		}
+	}
+	return false;
+}
+
+static inline bool vertexRequiresSpecialization(PDG *pdg, Vertex vertex) {
+	std::set<Vertex> visited;
+	std::function<bool(Vertex, int)> isShared = [pdg, &isShared, &visited](Vertex v, int limit) {
+		if (limit >= 0 && ((*pdg)[v].reaches_ipc_sink || (*pdg)[v].ipcsink))
+			return true;
+		if (limit > 5 || !visited.insert(v).second)
+			return false;
+		for (const auto &e: pdg->out_edges(v)) {
+			if (e.property.type == PDGEdge::Deref) {
+				if (isShared(e.target, limit + 1)) return true;
+			} else if (e.property.type == PDGEdge::Part) {
+				if (isShared(e.target, limit)) return true;
+			}
+		}
+		return false;
+	};
+
+	// "return malloc()"
+	if (isShared(vertex, -1))
+		return true;
+
+	for (const auto &e: pdg->in_edges(vertex)) {
+		if ((*pdg)[e].type != PDGEdge::Param) continue;
+		visited.clear();
+		if (isShared(e.source, -2)) {
+			return true;
 		}
 	}
 	return false;
@@ -138,6 +186,13 @@ bool PDGSpecializationPass::isSpecializationRequired(const std::vector<llvm::Fun
 				return true;
 			}
 		}
+		for (const auto &e: pdg->out_edges(pdg->getVertex(function))) {
+			if ((*pdg)[e].type == PDGEdge::Invocation || (*pdg)[e].type == PDGEdge::Summary_Invocation) {
+				if (vertexRequiresSpecialization(pdg, e.target))
+					return true;
+			}
+		}
+		if (function->getName() == "make_content") llvm::errs() << "NO SPEC make_content\n";
 	}
 	return false;
 }
@@ -338,6 +393,79 @@ matchAndPropagateTaint(PDG &graph, Use &use, std::vector<InstTy *> &newCalls, Fu
 	}
 }
 
+/**
+ *
+ * @param graph
+ * @param callVertex a real or dummy vertex symbolizing a call
+ * @param oldFunction
+ * @param newFunction
+ * @return true if this usage needs specialization / taint has been propagated
+ */
+static bool matchAndPropagateTaintGraphwise(PDG& graph, Vertex callVertex, Function* oldFunction, Function* newFunction) {
+	auto vFunc = graph.getVertex(newFunction);
+	bool something_reaches_ipc = false;
+
+	std::map<Vertex, Vertex> mapping;
+	std::function<void(Vertex, Vertex, int, bool *)> matchSubnodes =
+			[&mapping, &graph, &matchSubnodes](Vertex funcParam, Vertex callArg, int derefCounter, bool *something_reaches_ipc) {
+				if (mapping.find(funcParam) == mapping.end()) {
+					mapping[funcParam] = callArg;
+					if (derefCounter >= 0 && (graph[callArg].reaches_ipc_sink || graph[callArg].ipcsink)) {
+						graph[funcParam].reaches_ipc_sink = true;
+						*something_reaches_ipc = true;
+					}
+					for (const auto &e: graph.out_edges(funcParam)) {
+						if (graph[e].type == PDGEdge::Deref) {
+							auto v2 = graph.getDerefOpt(callArg);
+							if (v2)
+								matchSubnodes(e.target, *v2, derefCounter + 1, something_reaches_ipc);
+						} else if (graph[e].type == PDGEdge::Part) {
+							auto v2 = graph.getPartOpt(callArg, graph[e].index);
+							if (v2)
+								matchSubnodes(e.target, *v2, derefCounter, something_reaches_ipc);
+						}
+					}
+				}
+			};
+
+	// return value
+	auto vFuncRet = graph.getReturnOpt(vFunc);
+	if (vFuncRet)
+		matchSubnodes(*vFuncRet, callVertex, -1, &something_reaches_ipc);
+
+	// params
+	for (const auto &e: graph.in_edges(callVertex)) {
+		if (graph[e].type != PDGEdge::Param) continue;
+		mapping.clear();
+		if (oldFunction->isVarArg() && graph[e].index >= oldFunction->arg_size()) {
+			auto vFuncParam = graph.getParamOpt(vFunc, oldFunction->arg_size());
+			if (vFuncParam) {
+				matchSubnodes(*vFuncParam, e.source, -2, &something_reaches_ipc);
+			}
+		} else {
+			auto vFuncParam = graph.getParamOpt(vFunc, graph[e].index);
+			if (vFuncParam)
+				matchSubnodes(*vFuncParam, e.source, -2, &something_reaches_ipc);
+		}
+	}
+
+	return something_reaches_ipc;
+}
+
+static bool taintForCallArgument(PDG* pdg, CallInst* call, Function* oldFunction, Function* newFunction) {
+	auto f = getCalledFunction(call);
+	if (!f) return false;
+	auto v = pdg->getVertexOpt(f);
+	if (!(*pdg)[*v].ipcfunction) return false;
+	if (!oldFunction->getReturnType()->isPointerTy()) return false;
+	auto returnValue = pdg->getReturnOpt(pdg->getVertex(newFunction));
+	if (returnValue) {
+		markAsPointerToShared(*pdg, *returnValue);
+		return true;
+	}
+	return false;
+}
+
 
 void PDGSpecializationPass::specializeCalls(Function *oldFunction, Function *newFunction) {
 	auto &graph = *pdg;
@@ -346,20 +474,39 @@ void PDGSpecializationPass::specializeCalls(Function *oldFunction, Function *new
 
 	std::vector<CallInst *> newCalls;
 	std::vector<InvokeInst *> newInvokes;
+	std::vector<std::tuple<User*, int, boost::optional<Edge>>> newIndirectUses;
 
 	// follow * and . on both sides, copy over taint, specialize if anything found
 	for (auto &use: oldFunction->uses()) {
-		if (isa<CallInst>(use.getUser())) {
+		if (isa<CallInst>(use.getUser()) && cast<CallInst>(use.getUser())->getCalledFunction() == oldFunction) {
 			/*if (oldFunction->getName() == "retropt_string" && cast<CallInst>(use.getUser())->getFunction()->getName().endswith("_xioopen_openssl_prepare")) {
 				llvm::outs() << *use.getUser() << "\n";
 				llvm::outs() << "";
 			}*/
 			matchAndPropagateTaint(graph, use, newCalls, oldFunction, newFunction);
-		} else if (isa<InvokeInst>(use.getUser())) {
+		} else if (isa<InvokeInst>(use.getUser()) && cast<InvokeInst>(use.getUser())->getCalledFunction() == oldFunction) {
 			/*if (oldFunction->getName() == "_ZN2fz7to_utf8ERKNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE" && cast<InvokeInst>(use.getUser())->getFunction()->getName() == "_ZN13CQueueStorageC2Ev") {
 				llvm::outs() << *use.getUser() << "\n";
 			}*/
 			matchAndPropagateTaint(graph, use, newInvokes, oldFunction, newFunction);
+		} else {
+			// Find a matching invoke edge for indirect usages
+			for (const auto &e: graph.out_edges(graph.getVertex(oldFunction))) {
+				if (graph[e].type == PDGEdge::Invocation || graph[e].type == PDGEdge::Summary_Invocation) {
+					if (graph[e.target].instruction == use.getUser()) {
+						// we know here: this "use" and "edge" belong together and denote an indirect invocation
+						if (matchAndPropagateTaintGraphwise(graph, e.target, oldFunction, newFunction)) {
+							// needs specialization
+							newIndirectUses.emplace_back(use.getUser(), use.getOperandNo(), e);
+						}
+					}
+				}
+			}
+			// Check if this function is a call argument
+			if (isa<CallInst>(use.getUser()) && taintForCallArgument(pdg, cast<CallInst>(use.getUser()), oldFunction, newFunction)) {
+				newIndirectUses.emplace_back(use.getUser(), use.getOperandNo(), boost::optional<Edge>());
+				llvm::errs() << "[SPECIALIZE] " << oldFunction->getName() << " in " << *use.getUser() << "\n";
+			}
 		}
 	}
 
@@ -368,6 +515,25 @@ void PDGSpecializationPass::specializeCalls(Function *oldFunction, Function *new
 	}
 	for (auto call: newInvokes) {
 		call->setCalledFunction(newFunction);
+	}
+	for (auto use: newIndirectUses) {
+		// llvm::errs() << "Indirect use: replace op " << std::get<1>(use) << " in " << *std::get<0>(use) << " with " << newFunction->getName() << "\n";
+		std::get<0>(use)->setOperand(std::get<1>(use), newFunction);
+		// invoke edge
+		std::vector<Edge> edges;
+		auto e_op = std::get<2>(use);
+		if (e_op) edges.push_back(*e_op);
+		// param edge
+		auto v = graph.getVertex(std::get<0>(use));
+		for (const auto &edge: graph.out_edges(graph.getVertex(oldFunction))) {
+			if (edge.target == v && graph[edge].index == std::get<1>(use)) {
+				edges.push_back(edge);
+			}
+		}
+		for (auto e: edges) {
+			graph.remove_edge(e);
+			graph.add_edge(graph.getVertex(newFunction), e.target, e.property);
+		}
 	}
 
 	//TODO check uses of that function
@@ -443,8 +609,10 @@ static inline bool copyFileDescriptors(PDG &graph, InstTy *call, Function *funct
 	for (unsigned int i = 0; i < call->getNumArgOperands(); i++) {
 		mapping.clear();
 		auto vFuncParam = graph.getParamOpt(vFunc, i);
-		if (vFuncParam)
-			matchSubnodes(*vFuncParam, graph.getVertex(call->getArgOperand(i), call->getFunction()), &has_filedescriptors);
+		if (vFuncParam && !isIgnoredOperand(call->getArgOperand(i))) {
+			auto arg = graph.getVertexOpt(call->getArgOperand(i));
+			if (arg) matchSubnodes(*vFuncParam, *arg, &has_filedescriptors);
+		}
 	}
 
 	return has_filedescriptors;
@@ -462,6 +630,16 @@ void PDGSpecializationPass::propagateFileDescriptors(const std::vector<llvm::Fun
 		for (auto call: getCallsToFunction<InvokeInst>(function)) {
 			if (copyFileDescriptors(*pdg, call, function))
 				update = true;
+		}
+		if (config->strongFPAnalysis) {
+			for (auto indirectCall: *sccpass->getPossibleIndirectCalls(function)) {
+				auto call = dyn_cast<CallInst>(indirectCall);
+				if (call && copyFileDescriptors(*pdg, call, function))
+					update = true;
+				auto invoke = dyn_cast<InvokeInst>(indirectCall);
+				if (invoke && copyFileDescriptors(*pdg, invoke, function))
+					update = true;
+			}
 		}
 	}
 	if (update) {

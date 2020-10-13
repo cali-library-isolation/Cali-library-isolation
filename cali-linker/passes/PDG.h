@@ -13,6 +13,7 @@ struct PDGNode {
 	llvm::Value *instruction = nullptr;
 	llvm::Type *type = nullptr;
 	bool subnode = false; // true if node does not correspond to an instruction / value, but denotes a part of a value (struct member, pointer destination, ...)
+	bool dummy = false; // true if node is not really part of an instruction (example: cloned indirect calls from function summaries)
 	bool source = false; // true if node is memory source
 	bool ipcsink = false; // true for nodes that cross the ipc bridge (e.g: arguments of ipcfunction calls)
 	bool reaches_ipc_sink = false;  // memory allocating nodes that reach an ipcsink node (via data-flow)
@@ -31,8 +32,10 @@ struct PDGEdge {
 		Deref,
 		Param,
 		Return,
+		Invocation, // function pointer to call instruction invoking it
 		Summary_Data,
-		Summary_Equals
+		Summary_Equals,
+		Summary_Invocation
 	};
 	PDGEdgeType type;
 	unsigned int index = 0; // index of struct / param
@@ -51,7 +54,7 @@ class PDG : public PDG_Proto {
 public:
 	std::map<const llvm::Value *, Vertex> value_to_vertex;
 
-	std::map<const llvm::StructType *, int> structClusters;
+	const std::map<const llvm::StructType *, int> *structClusters;
 	std::map<int, std::set<unsigned int>> structClusterToKnownFDFields;
 
 	unsigned int max_parts = 32;
@@ -80,6 +83,12 @@ public:
 		remove_vertex(v);
 	}
 
+	inline void updateFunction(Vertex v, llvm::Function* function) {
+		function_to_vertices[(*this)[v].function].erase(v);
+		(*this)[v].function = function;
+		function_to_vertices[function].insert(v);
+	}
+
 	/**
 	 * Create the structural representation of a Value (using Deref and Part edges)
 	 * @param parent
@@ -96,6 +105,14 @@ public:
 	Vertex createVertex(llvm::Value *value, llvm::Function *function);
 
 	/**
+	 * Create a "dummy" vertex that has a link to a value, but the value does not link to it. There can be multiple dummy vertices for each value.
+	 * @param value
+	 * @param function
+	 * @return
+	 */
+	Vertex createDummyVertex(llvm::Value *value, llvm::Function *function);
+
+	/**
 	 * The function parameter is optional. If the value has no associated function, this one will be used.
 	 * @param value
 	 * @param function
@@ -104,8 +121,9 @@ public:
 	inline Vertex getVertex(llvm::Value *value, llvm::Function *function = nullptr) {
 		auto it = value_to_vertex.find(value);
 		if (it != value_to_vertex.end()) {
-			if (function != nullptr && (*this)[it->second].function == nullptr)
-				(*this)[it->second].function = function;
+			if (function != nullptr && (*this)[it->second].function == nullptr) {
+				updateFunction(it->second, function);
+			}
 			return it->second;
 		}
 		return createVertex(value, function);
@@ -119,7 +137,21 @@ public:
 
 	boost::optional<Vertex> getPartOpt(Vertex v, unsigned int index);
 
+	/**
+	 * Get a forward "param" edge (if exists). That means: Function => Parameter, Argument => Call
+	 * @param v
+	 * @param index
+	 * @return
+	 */
 	boost::optional<Vertex> getParamOpt(Vertex v, unsigned int index);
+
+	/**
+	 * Get a backwards "param" edge (if exists). That means: Parameter => Function, Call => Call Argument
+	 * @param v
+	 * @param index
+	 * @return
+	 */
+	boost::optional<Vertex> getCallParamOpt(Vertex v, unsigned int index);
 
 	boost::optional<Vertex> getReturnOpt(Vertex v);
 

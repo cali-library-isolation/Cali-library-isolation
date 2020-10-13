@@ -12,10 +12,11 @@ To preserve the functionality of the interactions between program and library, C
 Build
 -----
 - Install Clang/LLVM 7, including `lld`
+- Install (Ubuntu 18.04): `apt-get install -y systemtap-sdt-dev netsniff-ng libboost-filesystem1.65-dev libboost-system1.65-dev libnl-3-dev libnl-route-3-dev libnl-genl-3-dev libarchive-dev`
 - `mkdir build ; cd build` 
 - `cmake -DCMAKE_BUILD_TYPE=Release ..`
 - `make -j4`
-- To install, add `build/cali-linker` to your `$PATH`
+- To install, add `build/cali-linker` to your `$PATH`: `ln -s $(pwd)/build/cali-linker/cali /usr/local/bin/ld.cali`
 
 Tested on Ubuntu 18.04. Other distributions might need adjustments.
 

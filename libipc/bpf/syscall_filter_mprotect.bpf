@@ -1,0 +1,115 @@
+/* bpfc -i syscall_filter.bpf -f C -p | sed 's|0x1234|bpf_ident_|' > syscall_filter.h */
+
+#include "seccomp_constants.h"
+#include <sys/syscall.h>
+
+#define __start_text_mprotect_lo #0x12340001
+#define __start_text_mprotect_hi #0x12340002
+#define __stop_text_mprotect_lo  #0x12340003
+#define __stop_text_mprotect_hi  #0x12340004
+#define __start_text_lo #0x12340011
+#define __start_text_hi #0x12340012
+#define __stop_text_lo  #0x12340013
+#define __stop_text_hi  #0x12340014
+#define fd_shared_memory  #0x12340020
+
+
+
+; 0 = syscall nr
+; 4 = architecture
+; 8 = instruction_pointer
+; 16 = arg1
+; 24 = arg2
+; 32 = arg3
+; 40 = arg4
+; 48 = arg5
+; 56 = arg6
+
+
+ld [4]  ; load architecture
+jne #AUDIT_ARCH_X86_64, bad
+
+ld [0]  ; load syscall number
+jeq #SYS_mprotect, mprotect
+jeq #SYS_dup,      restrict_fd_arg1
+jeq #SYS_dup2,     restrict_fd_arg1
+jeq #SYS_dup3,     restrict_fd_arg1
+jeq #SYS_write,    restrict_fd_arg1
+jeq #SYS_writev,   restrict_fd_arg1
+jeq #SYS_pwritev,  restrict_fd_arg1
+jeq #SYS_sendfile, restrict_fd_arg1
+jeq #SYS_splice,   restrict_fd_arg3
+jeq #SYS_tee,      restrict_fd_arg2
+jeq #SYS_mmap,     restrict_fd_arg5
+jmp good
+
+mprotect:
+  /*
+  if (arg1 / arg1+arg2 matches 0x3f0000000000 and arg3 contains PROT_WRITE) {
+  	assert(instruction_pointer in text_mprotect)
+  }
+  */
+  ld [32]  ; load arg3
+  jset #PROT_WRITE, mprotect_write
+  ret #SECCOMP_RET_ALLOW
+
+mprotect_write:
+  ; make something writeable
+  ld [20]  ; load arg1/hi = address
+  and #0xffffff00
+  jeq #0x00003f00, mprotect_check_privileged
+  ; do never make libipc writeable
+  ; if (addr >= text_end || addr+len <= text_start) return allow;
+  ld [20]  ; load arg1/hi = address
+  jgt __stop_text_hi, good
+  jlt __stop_text_hi, mprotect_write_2
+  ; >= check lo
+  ld [16]  ; load arg1/lo = address
+  jge __stop_text_lo, good
+mprotect_write_2: ; check addr+len <= text_start
+  ld [20]
+  tax
+  ld [28]
+  add %x
+  jlt __start_text_hi, good
+  ; TODO could be improved here
+  ; handle error
+  jmp bad
+
+mprotect_check_privileged:
+  ; instruction pointer must be in [__start_text_mprotect, __stop_text_mprotect)
+  ld [12]
+  jne __start_text_mprotect_hi, bad
+  ld [8]
+  jlt __start_text_mprotect_lo, bad
+  jgt __stop_text_mprotect_lo, bad
+  jmp good
+
+
+restrict_fd_arg1:
+  ld [16]
+  jeq fd_shared_memory, bad
+  jmp good
+
+restrict_fd_arg2:
+  ld [24]
+  jeq fd_shared_memory, bad
+  jmp good
+
+restrict_fd_arg3:
+  ld [32]
+  jeq fd_shared_memory, bad
+  jmp good
+
+restrict_fd_arg5:
+  ld [48]
+  jeq fd_shared_memory, bad
+  jmp good
+
+
+good:
+  ret #SECCOMP_RET_ALLOW
+
+bad:
+  ret #SECCOMP_RET_TRAP
+  ret #SECCOMP_RET_KILL

@@ -37,6 +37,8 @@ public:
 
 	void runOnSCC(const std::vector<llvm::Function *> &scc);
 
+	void runOnGlobal();
+
 	template<class InstTy>
 	bool addKnownFunctionSummary(llvm::Function *calledFunction, InstTy &call);
 
@@ -68,10 +70,6 @@ public:
 
 	template<class InstTy>
 	void markIpcCall(InstTy *call);
-
-	void markAsPointerToShared(Vertex v);
-
-	void markAsShared(Vertex v);
 
 };
 

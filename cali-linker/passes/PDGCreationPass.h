@@ -13,9 +13,10 @@ public:
 	PDG graph;
 	const std::set<std::string> &externalSymbols;
 	const YamlConfig *config = nullptr;
+	const ContextConfig* contextConfig = nullptr;
 
-	PDGCreationPass(const YamlConfig* config, const std::set<std::string> &externalSymbols)
-	: ModulePass(ID), externalSymbols(externalSymbols), config(config), graph(config) {}
+	PDGCreationPass(const YamlConfig* config, const ContextConfig* contextConfig, const std::set<std::string> &externalSymbols)
+	: ModulePass(ID), externalSymbols(externalSymbols), config(config), contextConfig(contextConfig), graph(config) {}
 
 	PDGCreationPass() : ModulePass(ID), externalSymbols(*new std::set<std::string>()), graph(nullptr) {}
 
@@ -31,8 +32,6 @@ public:
 	void addEdges(Vertex v, llvm::User *instruction);
 
 	void specialGEPHandling(llvm::User *ins, Vertex memVertex);
-
-	void analyzeStructs(llvm::Module& M);
 };
 
 

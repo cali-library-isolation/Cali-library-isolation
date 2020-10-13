@@ -25,13 +25,18 @@ namespace ipcrewriter {
 
 	int CommunicationPair::next_id = 1;
 
-	CommunicationPair::CommunicationPair(IpcModule *module1, IpcModule *module2) : id(next_id++), next_code(3), module1(module1), module2(module2) {
-		initModule(LlvmIpcModule::context);
+	CommunicationPair::CommunicationPair(IpcModule *module1, IpcModule *module2, bool concurrentLibraryCommunication)
+			: id(next_id++), next_code(3), module1(module1), module2(module2), concurrentLibraryCommunication(concurrentLibraryCommunication) {
+		logEntries.emplace_back("=== COMMUNICATION ===");
+		// initModule(LlvmIpcModule::context);
 	}
 
 	CommunicationPair::~CommunicationPair() {
 		for (auto &it: wrappedFunctions) {
-			if (it.second) delete it.second;
+			if (it.second) {
+				// printf("- %d : %s\n", it.second->code, it.first.c_str());
+				delete it.second;
+			}
 		}
 	}
 
@@ -65,7 +70,9 @@ namespace ipcrewriter {
 		wrapIncomingCallback = module->getFunction("wrap_incoming_callback");
 		wrapOutgoingVaList = module->getFunction("wrap_outgoing_valist");
 		wrapPointerFromCallback = module->getFunction("wrap_pointer_from_callback");
+		unwrapPointerFromCallback = module->getFunction("unwrap_pointer_from_callback");
 		ipcShareFD = module->getFunction("ipc_share_fd");
+		ipcLockSending = module->getFunction("ipc_lock_sending");
 		nsjailConfigure = module->getFunction("nsjail_configure");
 		// module->getFunction("__unused_stuff_for_nsjail_configure")->removeFromParent();
 		module->getFunction("__unused_stuff_for_nsjail_configure")->setLinkage(InternalFunctionLinkage);
@@ -163,49 +170,78 @@ namespace ipcrewriter {
 		Function *replacement = Function::Create(functionType, GlobalValue::LinkageTypes::ExternalLinkage, replacementName, &*module);
 		IRBuilder<> builder(BasicBlock::Create(context, "entry", replacement));
 
+		// User instrumentation
+		auto userInstrumentName = "instrument_before_"+originalFunction->getName().str();
+		if (userInstrumentedFunctions.find(userInstrumentName) != userInstrumentedFunctions.end()) {
+			auto userInstrumentFunction = (Function*) module->getOrInsertFunction(userInstrumentName, replacement->getFunctionType());
+			std::vector<Value*> args;
+			for (auto &arg: replacement->args()) args.push_back(&arg);
+			builder.CreateCall(userInstrumentFunction, args);
+		}
+
 		//TODO debug
 		// auto timing_debug = module->getOrInsertFunction("__ipc_timing_debug_simple", FunctionType::get(Type::getVoidTy(context), {IntegerType::getInt8PtrTy(context)}, false));
 		// builder.CreateCall(timing_debug, {generateNonConstantString(":ipc call: " + originalFunction->getName().str(), builder)});
 
 		// handle FD arguments
-		int fdIndex = -1;
-		Value *fdValue = nullptr;
+		std::map<int, Value*> fdValues;
 		if (fileDescriptorPolicy && !fileDescriptorPolicy->empty()) {
 			auto it = fileDescriptorPolicy->find(originalFunction->getName());
 			if (it != fileDescriptorPolicy->end()) {
-				fdIndex = it->second;
-				auto arg = replacement->arg_begin();
-				std::advance(arg, fdIndex);
-				fdValue = builder.CreateCall(ipcShareFD, {arg});
+				for (int fdIndex: it->second) {
+					if (fdIndex < 0) continue;
+					auto arg = replacement->arg_begin();
+					std::advance(arg, fdIndex);
+					if (!arg->getType()->isIntegerTy()) {
+						llvm::errs() << "WARN INVALID FD TYPE: " << *arg->getType() << " " << *arg << "\n";
+						continue;
+					}
+					if (arg->getType()->getIntegerBitWidth() == 32) {
+						fdValues[fdIndex] = builder.CreateCall(ipcShareFD, {arg});
+					} else {
+						auto Int32 = Type::getInt32Ty(context);
+						fdValues[fdIndex] = builder.CreateIntCast(builder.CreateCall(ipcShareFD, {builder.CreateIntCast(arg, Int32, true)}), arg->getType(), true);
+					}
+				}
 			}
 		}
 
-		// write function code to shm
-		Instruction *sendingData = builder.CreateCall(getSendingStruct);
-		unsigned int code = next_code++;
-		builder.CreateStore(ConstantInt::get(Int, code), builder.CreateStructGEP(basicCommMemType, sendingData, 0));
-
 		// write parameters to shm
+		if (concurrentLibraryCommunication) {
+			builder.CreateCall(ipcLockSending);
+		}
+		Instruction *sendingData = builder.CreateCall(getSendingStruct);
 		ArrayRef<Type *> paramTypes(functionType->param_begin(), functionType->param_end());
 		vector<Value *> paramValues;
 		if (!paramTypes.empty()) {
 			StructType *paramStruct = StructType::create(paramTypes);
 			PointerType *paramStructPtr = PointerType::get(paramStruct, 0);
 
-			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, sendingData, 2);
+			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, sendingData, basicCommMemTypeIdxData);
 			paramPtr = builder.CreateBitCast(paramPtr, paramStructPtr);
 			unsigned int i = 0;
 			for (auto &arg: replacement->args()) {
 				Value *value = wrapOutgoingValue(&arg, builder);
 				// check for fd
-				if (i == fdIndex) {
+				auto fdValue = fdValues.find(i);
+				if (fdValue != fdValues.end()) {
 					dbg_llvm_outs << " -> Wrapped outgoing fd #" << i << ": " << *value << "\n";
-					value = fdValue;
+					logEntries.push_back(" -> Wrapped outgoing fd #" + std::to_string(i));
+					value = fdValue->second;
 				}
-				builder.CreateStore(value, builder.CreateStructGEP(paramStruct, paramPtr, i++));
 				paramValues.push_back(value);
+				i++;
+			}
+
+			for (i = 0; i < paramValues.size(); i++) {
+				builder.CreateStore(paramValues[i], builder.CreateStructGEP(paramStruct, paramPtr, i));
 			}
 		}
+
+		// write function code to shm
+		unsigned int code = next_code++;
+		builder.CreateStore(ConstantInt::get(Int, code), builder.CreateStructGEP(basicCommMemType, sendingData, 0));
+		logEntries.push_back("Code " + std::to_string(code) + ": function " + originalFunction->getName().str());
 
 		// wait for IPC result
 		builder.CreateCall(module->getOrInsertFunction("trigger_ipc_call", FunctionType::get(Type::getVoidTy(context), false)));
@@ -223,15 +259,32 @@ namespace ipcrewriter {
 			}
 		}
 
+		// User instrumentation
+		userInstrumentName = "instrument_after_"+originalFunction->getName().str();
 		if (!functionType->getReturnType()->isVoidTy()) {
 			// load result from shm
-			result = builder.CreateStructGEP(basicCommMemType, result, 2);
+			result = builder.CreateStructGEP(basicCommMemType, result, basicCommMemTypeIdxData);
 			result = builder.CreateBitCast(result, PointerType::get(functionType->getReturnType(), 0));
 			result = builder.CreateLoad(result);
 			result = wrapIncomingValue(result, builder);
+			if (userInstrumentedFunctions.find(userInstrumentName) != userInstrumentedFunctions.end()) {
+				auto userInstrumentFunction = (Function *) module->getOrInsertFunction(
+						userInstrumentName,
+						FunctionType::get(Type::getVoidTy(context), {result->getType()}, false)
+				);
+				builder.CreateCall(userInstrumentFunction, {result});
+			}
 			builder.CreateRet(result);
 		} else {
+			if (userInstrumentedFunctions.find(userInstrumentName) != userInstrumentedFunctions.end()) {
+				auto userInstrumentFunction = (Function*) module->getOrInsertFunction(userInstrumentName, FunctionType::get(Type::getVoidTy(context), {}, false));
+				builder.CreateCall(userInstrumentFunction, {});
+			}
 			builder.CreateRetVoid();
+		}
+
+		for (const auto &it: fdValues) {
+			logEntries.push_back("  with FD argument " + to_string(it.first));
 		}
 
 		//auto it = wrappedFunctions.emplace(replacementName, WrapperFunctionInfos(originalFunction, replacement, code));
@@ -287,7 +340,7 @@ namespace ipcrewriter {
 			StructType *paramStruct = StructType::create(paramTypes);
 			PointerType *paramStructPtr = PointerType::get(paramStruct, 0);
 
-			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, receivingData, 2);
+			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, receivingData, basicCommMemTypeIdxData);
 			paramPtr = builder.CreateBitCast(paramPtr, paramStructPtr);
 			unsigned int i = 0;
 			for (auto &arg: wfi.wrapper->args()) {
@@ -301,10 +354,22 @@ namespace ipcrewriter {
 		builder.SetCurrentDebugLocation(DebugLoc::get(10000 * wfi.code + 100, 0, hf.debug));
 		Value *result = builder.CreateCall(func, params);
 
+		// Wrap result if it is a file descriptor
+		if (fileDescriptorPolicy && !fileDescriptorPolicy->empty()) {
+			auto it = fileDescriptorPolicy->find(func->getName());
+			if (it != fileDescriptorPolicy->end() && std::find(it->second.begin(), it->second.end(), -1) != it->second.end()) {
+				logEntries.push_back(" -> wrap result as FD");
+				result = builder.CreateCall(ipcShareFD, {result});
+			}
+		}
+
 		// Save result to shm
+		if (concurrentLibraryCommunication && (wfi.code <= 2 || wfi.code > 8)) {  // "internal" functions must not be interrupted
+			builder.CreateCall(ipcLockSending, {});
+		}
 		builder.SetCurrentDebugLocation(DebugLoc::get(10000 * wfi.code + 200, 0, hf.debug));
 		if (!wfi.wrapper->getFunctionType()->getReturnType()->isVoidTy()) {
-			Value *resultMemory = builder.CreateStructGEP(basicCommMemType, hf.sendingStruct, 2);
+			Value *resultMemory = builder.CreateStructGEP(basicCommMemType, hf.sendingStruct, basicCommMemTypeIdxData);
 			resultMemory = builder.CreateBitCast(resultMemory, PointerType::get(wfi.wrapper->getFunctionType()->getReturnType(), 0));
 			result = wrapOutgoingValue(result, builder);
 			builder.CreateStore(result, resultMemory);
@@ -339,15 +404,32 @@ namespace ipcrewriter {
 
 	void CommunicationPair::createInternalReplacements() {
 		LLVMContext &context = module->getContext();
+		Type *voidty = Type::getVoidTy(context);
 		Type *voidptr = Type::getInt8PtrTy(context);
 		IntegerType *sizet = IntegerType::getIntNTy(context, 8 * (sizeof(size_t)));
 		IntegerType *Int = Type::getInt32Ty(context);
 
 		// void *internal_mremap(void *addr, size_t old_length, size_t length, int flags);
-		vector<Type *> params({voidptr, sizet, sizet, Int});
+		/*vector<Type *> params({voidptr, sizet, sizet, Int});
 		Function *func = cast<Function>(module->getOrInsertFunction("internal_mremap", FunctionType::get(voidptr, params, false)));
 		string name = "__ipc_replacement_internal_mremap";
 		auto newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
+		createReplacementHandler(*newWrapper, processIpcCall1, 0);
+		createReplacementHandler(*newWrapper, processIpcCall2, 1);*/
+
+		// void internal_remap_shm(void);
+		vector<Type *> params({});
+		Function *func = cast<Function>(module->getOrInsertFunction("internal_remap_shm", FunctionType::get(voidty, params, false)));
+		string name = "__ipc_replacement_internal_remap_shm";
+		auto newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
+		createReplacementHandler(*newWrapper, processIpcCall1, 0);
+		createReplacementHandler(*newWrapper, processIpcCall2, 1);
+
+		// void *internal_mmap(void *addr, size_t old_length, size_t length, int flags);
+		params = {voidptr, sizet, Int, Int, Int, sizet};
+		func = cast<Function>(module->getOrInsertFunction("internal_mmap", FunctionType::get(voidptr, params, false)));
+		name = "__ipc_replacement_internal_mmap";
+		newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
 		createReplacementHandler(*newWrapper, processIpcCall1, 0);
 		createReplacementHandler(*newWrapper, processIpcCall2, 1);
 
@@ -359,15 +441,24 @@ namespace ipcrewriter {
 		createReplacementHandler(*newWrapper, processIpcCall2, 1);
 
 		// int internal_receive_fd(void* fileDescriptorMapping, int fd);
-		func = cast<Function>(module->getOrInsertFunction("internal_receive_fd", FunctionType::get(Int, {voidptr, Int}, false)));
+		func = cast<Function>(module->getOrInsertFunction("internal_receive_fd", FunctionType::get(Int, {voidptr, Int, Int}, false)));
 		name = "__ipc_replacement_internal_receive_fd";
 		newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
 		createReplacementHandler(*newWrapper, processIpcCall1, 0);
 		createReplacementHandler(*newWrapper, processIpcCall2, 1);
 
 		// void internal_close_fd(int local_fd);
-		func = cast<Function>(module->getOrInsertFunction("internal_close_fd", FunctionType::get(Type::getVoidTy(context), {Int}, false)));
+		func = cast<Function>(module->getOrInsertFunction("internal_close_fd", FunctionType::get(Type::getVoidTy(context), {Int, Int}, false)));
 		name = "__ipc_replacement_internal_close_fd";
+		newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
+		createReplacementHandler(*newWrapper, processIpcCall1, 0);
+		createReplacementHandler(*newWrapper, processIpcCall2, 1);
+
+		// sighandler_t internal_signal(int signum, sighandler_t handler);
+		// typedef void (*sighandler_t)(int);
+		auto SighandlerT = FunctionType::get(Type::getVoidTy(context), {Int}, false)->getPointerTo();
+		func = cast<Function>(module->getOrInsertFunction("internal_signal", FunctionType::get(SighandlerT, {Int, SighandlerT}, false)));
+		name = "__ipc_replacement_internal_signal";
 		newWrapper = createReplacementFunction<CallInst>(name, func, nullptr);
 		createReplacementHandler(*newWrapper, processIpcCall1, 0);
 		createReplacementHandler(*newWrapper, processIpcCall2, 1);
@@ -408,6 +499,10 @@ namespace ipcrewriter {
 			auto unwrapped = builder.CreateCall(wrapIncomingCallback, {builder.CreateBitCast(value, voidptr), builder.CreateBitCast(replacement, voidptr)});
 			value = builder.CreateBitCast(unwrapped, value->getType());
 			dbg_llvm_outs << "-> Wrapping incoming callback " << *value->getType() << "\n";
+			std::string buffer;
+			llvm::raw_string_ostream os(buffer);
+			value->print(os);
+			logEntries.push_back("  with callback valueid=" + os.str());
 		}
 		return value;
 	}
@@ -441,7 +536,7 @@ namespace ipcrewriter {
 			StructType *paramStruct = StructType::create(paramTypes);
 			PointerType *paramStructPtr = PointerType::get(paramStruct, 0);
 
-			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, receivingData, 2);
+			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, receivingData, basicCommMemTypeIdxData);
 			paramPtr = builder.CreateBitCast(paramPtr, paramStructPtr);
 			for (unsigned int i = 0; i < functionType->getNumParams(); i++) {
 				Value *argument = builder.CreateLoad(builder.CreateStructGEP(paramStruct, paramPtr, i));
@@ -451,8 +546,11 @@ namespace ipcrewriter {
 		// Call original function
 		Value *result = builder.CreateCall(callback, params);
 		// Save result to shm
+		if (concurrentLibraryCommunication) {
+			builder.CreateCall(ipcLockSending);
+		}
 		if (!functionType->getReturnType()->isVoidTy()) {
-			Value *resultMemory = builder.CreateStructGEP(basicCommMemType, sendingData, 2);
+			Value *resultMemory = builder.CreateStructGEP(basicCommMemType, sendingData, basicCommMemTypeIdxData);
 			resultMemory = builder.CreateBitCast(resultMemory, PointerType::get(functionType->getReturnType(), 0));
 			result = wrapOutgoingValue(result, builder);
 			builder.CreateStore(result, resultMemory);
@@ -484,48 +582,68 @@ namespace ipcrewriter {
 
 		Function *replacement = Function::Create(functionType, InternalFunctionLinkage, "__ipc_callback_replacement_" + to_string((uintptr_t) type), &*module);
 		IRBuilder<> builder(BasicBlock::Create(context, "entry", replacement));
+		Value *callbackGetter = InlineAsm::get(FunctionType::get(voidptr, false), "movq %r11, $0", "=r", true);
+		Value *callback = builder.CreateCall(callbackGetter);
 		Instruction *sendingData = builder.CreateCall(getSendingStruct);
 
 		auto diType = diBuilder->createSubroutineType(diBuilder->getOrCreateTypeArray(vector<Metadata *>()));
 		DISubprogram *diSub = diBuilder->createFunction(diUnit, replacement->getName(), StringRef(), diUnit, 0, diType, true, true, 0);
 		replacement->setSubprogram(diSub);
 
-		// Write callback number to shm
-		Value *callbackGetter = InlineAsm::get(FunctionType::get(voidptr, false), "movq %r11, $0", "=r", false);
-		builder.CreateStore(builder.CreateCall(callbackGetter), builder.CreateStructGEP(basicCommMemType, sendingData, 1));
-
-		// write function code to shm => 2 = callback
-		builder.CreateStore(ConstantInt::get(Int, 2), builder.CreateStructGEP(basicCommMemType, sendingData, 0));
-
 		// write parameters to shm
 		ArrayRef<Type *> paramTypes(functionType->param_begin(), functionType->param_end());
 		std::vector<Value *> copiedValues;
-		if (paramTypes.size() > 0) {
+		std::vector<Value *> arguments;
+		if (!paramTypes.empty()) {
+			for (auto &arg: replacement->args()) {
+				arguments.push_back(wrapOutgoingValue(&arg, builder));
+			}
+		}
+		if (concurrentLibraryCommunication) {
+			builder.CreateCall(ipcLockSending);
+		}
+		std::vector<std::pair<Value*, Value*>> modifiedPointers;
+		if (!paramTypes.empty()) {
 			StructType *paramStruct = StructType::create(paramTypes);
 			PointerType *paramStructPtr = PointerType::get(paramStruct, 0);
-
-			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, sendingData, 2);
+			Value *paramPtr = builder.CreateStructGEP(basicCommMemType, sendingData, basicCommMemTypeIdxData);
 			paramPtr = builder.CreateBitCast(paramPtr, paramStructPtr);
 			unsigned int i = 0;
-			for (auto &arg: replacement->args()) {
-				Value *value = wrapOutgoingValue(&arg, builder);
+			for (auto value: arguments) {
 				auto addr = builder.CreateStructGEP(paramStruct, paramPtr, i++);
 				if (value->getType()->isPointerTy()) {
 					// we check if that's a pointer to something on the stack. If so, we have to copy.
-					auto tmp = builder.CreateBitCast(value, wrapPointerFromCallback->getReturnType());
-					tmp = builder.CreateCall(wrapPointerFromCallback, {tmp});
-					value = builder.CreateBitCast(tmp, value->getType());
+					auto tmpOld = builder.CreateBitCast(value, wrapPointerFromCallback->getReturnType());
+					auto tmpNew = builder.CreateCall(wrapPointerFromCallback, {tmpOld});
+					value = builder.CreateBitCast(tmpNew, value->getType());
+					modifiedPointers.emplace_back(tmpOld, tmpNew);
 				}
 				builder.CreateStore(value, addr);
 			}
 		}
 
+		// Write callback number to shm
+		builder.CreateStore(callback, builder.CreateStructGEP(basicCommMemType, sendingData, 2));
+
+		// write function code to shm => 2 = callback
+		builder.CreateStore(ConstantInt::get(Int, 2), builder.CreateStructGEP(basicCommMemType, sendingData, 0));
+
 		// wait for IPC result
 		builder.CreateCall(module->getOrInsertFunction("trigger_ipc_call", FunctionType::get(Type::getVoidTy(context), false)));
 		Value *result = builder.CreateCall(module->getOrInsertFunction("ipc_wait_for_return", FunctionType::get(PointerType::get(basicCommMemType, 0), false)));
+		for (const auto& it: modifiedPointers) {
+			std::vector<Value*> unwrapArguments;
+			unwrapArguments.push_back(it.first);
+			unwrapArguments.push_back(it.second);
+			unwrapArguments.push_back(ConstantInt::get(Type::getInt32Ty(context), modifiedPointers.size() - 1));
+			for (const auto& it2: modifiedPointers) {
+				if (it2.first != it.first) unwrapArguments.push_back(it2.first);
+			}
+			builder.CreateCall(unwrapPointerFromCallback, unwrapArguments);
+		}
 		if (!functionType->getReturnType()->isVoidTy()) {
 			// load result from shm
-			result = builder.CreateStructGEP(basicCommMemType, result, 2);
+			result = builder.CreateStructGEP(basicCommMemType, result, basicCommMemTypeIdxData);
 			result = builder.CreateBitCast(result, PointerType::get(functionType->getReturnType(), 0));
 			result = builder.CreateLoad(result);
 			result = wrapIncomingValue(result, builder);
@@ -623,6 +741,24 @@ namespace ipcrewriter {
 		// Constant* zero = ConstantInt::get(Type::getInt32Ty(module->getContext()), 0);
 		// return ConstantExpr::getInBoundsGetElementPtr(var->getType(), var, ArrayRef<Value *>{zero, zero});
 		return builder.CreateBitCast(var, Type::getInt8PtrTy(module->getContext()));
+	}
+
+	void CommunicationPair::loadUserInstrumentation(const string &name) {
+		auto lib = applicationPath.parent_path().append("instrumentations").append("libinstrument-"+name+".so");
+		BinaryIpcModule m(lib.string(), false, nullptr, nullptr);
+		m.loadModuleFile();
+		for (const auto &s: m.getExports()) {
+			if (StringRef(s).startswith("instrument_"))
+				userInstrumentedFunctions.insert(s);
+		}
+		newArguments.push_back("-L"+applicationPath.parent_path().append("instrumentations").string());
+		newArguments.push_back("-rpath="+applicationPath.parent_path().append("instrumentations").string());
+		newArguments.push_back("-linstrument-"+name);
+		llvm::errs() << "LOADED " << m.getExports().size() << " EXPORTS\n"; //TODO
+	}
+
+	void CommunicationPair::initModule() {
+		initModule(LlvmIpcModule::context);
 	}
 
 

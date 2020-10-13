@@ -24,7 +24,7 @@ void*  shm_valloc(size_t);
 int    shm_mallopt(int, int);
 void*  shm_pvalloc(size_t);
 
-
+void init_shm_malloc(void* ptr); // give me some initially shared memory(!)
 
 #ifdef __cplusplus
 };
@@ -32,8 +32,10 @@ void*  shm_pvalloc(size_t);
 
 
 #define shm_shared_memory_base (    0x3f0000000000)
+#define shm_shared_memory_file (    0x3e0000000000)
 #define shm_shared_memory_mask (0xffffff0000000000)
 #define shm_is_shared_memory_pointer(p) (((uintptr_t) (p) & shm_shared_memory_mask) == shm_shared_memory_base)
+#define shm_is_shared_file_pointer(p) (((uintptr_t) (p) & shm_shared_memory_mask) == shm_shared_memory_file)
 
 //#define shm_debug(...) fprintf(stderr, __VA_ARGS__)
 #define shm_debug(...)

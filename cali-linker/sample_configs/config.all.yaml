@@ -13,12 +13,21 @@ filedescriptors: {}  # Map ["function name" => argument number] to support FD de
 contexts:
   main:
     instrument: false
+    instrumentCoverage: false
+    instrumentUser: ""
+    mprotect_mode: false
+    sequential_mode: false
+    programIsForking: false
+    silent: 0
+    concurrentLibraryCommunication: false
+    function_behavior: {}
     selectors:
       - "*.o"
       - "libstdc++.a"
   library:
     selectors:
       - "libabc.so"
+    ignored_functions: []
     permissions:
       readonly:
         - /bin

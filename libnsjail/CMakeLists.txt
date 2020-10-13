@@ -3,6 +3,7 @@ project(libnsjail)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_definitions(-D_GNU_SOURCE)
 # from original nsjail makefile
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all -O2")

@@ -9,3 +9,5 @@ int use_nsjail() {
 #endif
 }
 
+
+void __warning_breakpoint() {}

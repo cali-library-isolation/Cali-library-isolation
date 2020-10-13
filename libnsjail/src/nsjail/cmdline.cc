@@ -306,6 +306,9 @@ static bool setupArgv(nsjconf_t* nsjconf, int argc, char** argv, int optind) {
 	 * If user provided cmdline via nsjail [opts] -- [cmdline], then override the one from the
 	 * config file
 	 */
+	if (argv == nullptr || argc <= 0) {
+		return true;
+	}
 	if (optind < argc) {
 		nsjconf->argv.clear();
 		for (int i = optind; i < argc; i++) {

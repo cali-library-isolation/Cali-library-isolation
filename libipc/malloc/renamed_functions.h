@@ -4,7 +4,7 @@
 #define __mmap shm_mmap
 #define __mremap shm_mremap
 #define __munmap shm_munmap
-#define __mprotect mprotect
+#define __mprotect shm_mprotect
 #define __get_nprocs get_nprocs
 
 #include "shared_memory_manger.h"

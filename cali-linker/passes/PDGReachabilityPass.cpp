@@ -32,6 +32,7 @@ bool PDGReachabilityPass::runOnModule(Module &M) {
 	pdg = &getAnalysis<PDGCreationPass>().graph;
 	sccpass = &getAnalysis<DataDrivenSCCPass>();
 
+	runOnGlobal();
 	for (auto &scc: sccpass->getSCCs()) {
 		runOnSCC(scc);
 	}
@@ -41,6 +42,7 @@ bool PDGReachabilityPass::runOnModule(Module &M) {
 			calculateFDReachability(*pdg, functions, *colors, config->strongFDAnalysis);
 		}
 	}
+	runOnGlobal();
 
 	return false;
 }
@@ -140,85 +142,125 @@ void PDGReachabilityPass::runOnSCC(const std::vector<llvm::Function *> &scc) {
 	dbg_llvm_outs << "\n";
 }
 
+void PDGReachabilityPass::runOnGlobal() {
+	auto &graph = *pdg;
+	std::set<Function *> functions({nullptr});
+	colors = std::make_shared<basegraph::ColorMap>(graph);
+	calculateSinkReachability(*pdg, functions, *colors);
+	calculateFDReachability(*pdg, functions, *colors, config->strongFDAnalysis);
+}
+
 
 template<class InstTy>
 void PDGReachabilityPass::handleCall(std::vector<InstTy *> &indirectCalls, Function *function, Instruction &ins, std::set<Function *> &functions) {
-	auto &graph = *pdg;
 	auto &call = cast<InstTy>(ins);
-	auto calledFunction = getCalledFunction(call);
-	if (calledFunction && addKnownFunctionSummary(calledFunction, call)) {
-		// function has been already handled (memcpy etc)
-	} else if (calledFunction && functions.find(calledFunction) != functions.end()) {
-		// Function is in the same SCC - add direct edges
-		auto vCall = graph.getVertex(&ins);
-		auto vFunc = graph.getVertex(calledFunction);
-		// params
-		for (unsigned int i = 0; i < call.getNumArgOperands(); i++) {
-			auto vFuncParam = graph.getParamOpt(vFunc, i);
-			if (vFuncParam && !isIgnoredOperand(call.getArgOperand(i)))
-				// We do not want data flow coming out of a parameter - therefore reduced unification
-				graph.addSubnodeEdges(graph.getVertex(call.getArgOperand(i), function), *vFuncParam, 1);
-		}
-		// return value
-		auto vFuncRet = graph.getReturnOpt(vFunc);
-		if (vFuncRet)
-			graph.addSubnodeEdges(*vFuncRet, vCall);
 
-	} else if (calledFunction && isa<Function>(calledFunction)) {
-		// Function is in another SCC - there must be summary edges
-		auto vCall = graph.getVertex(&ins);
-		auto vFunc = graph.getVertex(calledFunction);
-		// function signature nodes -> callside nodes. We expect structural equivalence (in terms of parameters / return value structure)
-		std::map<Vertex, Vertex> matching;
-		// params
-		for (unsigned int i = 0; i < call.getNumArgOperands(); i++) {
-			if (isIgnoredOperand(call.getArgOperand(i))) continue;
-			if (calledFunction->isVarArg() && i >= calledFunction->arg_size()) {
-				auto vFuncParam = graph.getParamOpt(vFunc, calledFunction->arg_size());
-				if (vFuncParam) {
-					matchSubnodes(matching, *vFuncParam, graph.getVertex(call.getArgOperand(i), function));
-					// hack, since we have no vararg types on callee side
-					if (graph[*vFuncParam].reaches_ipc_sink) {
-						markSubnodesReachingIpc(graph.getVertex(call.getArgOperand(i), function));
-					}
-				}
-			} else {
+	auto handleCallTarget = [this, function, &ins, functions, &call](Function *calledFunction) {
+		auto &graph = *pdg;
+		if (calledFunction && addKnownFunctionSummary(calledFunction, call)) {
+			// function has been already handled (memcpy etc)
+		} else if (calledFunction && functions.find(calledFunction) != functions.end()) {
+			// Function is in the same SCC - add direct edges
+			auto vCall = graph.getVertex(&ins);
+			auto vFunc = graph.getVertex(calledFunction);
+			// params
+			for (unsigned int i = 0; i < call.getNumArgOperands(); i++) {
 				auto vFuncParam = graph.getParamOpt(vFunc, i);
-				if (vFuncParam)
-					matchSubnodes(matching, *vFuncParam, graph.getVertex(call.getArgOperand(i), function));
+				if (vFuncParam && !isIgnoredOperand(call.getArgOperand(i)))
+					// We do not want data flow coming out of a parameter - therefore reduced unification
+					graph.addSubnodeEdges(graph.getVertex(call.getArgOperand(i), function), *vFuncParam, 1);
 			}
-		}
-		// return value
-		auto vFuncRet = graph.getReturnOpt(vFunc);
-		if (vFuncRet)
-			matchSubnodes(matching, *vFuncRet, vCall);
+			// return value
+			auto vFuncRet = graph.getReturnOpt(vFunc);
+			if (vFuncRet)
+				graph.addSubnodeEdges(*vFuncRet, vCall);
 
-		// copy summary edges and ipcsink property
-		for (const auto &it: matching) {
-			if (graph[it.first].reaches_ipc_sink)
-				graph[it.second].reaches_ipc_sink = true;
-			if (graph[it.first].filedescriptor && isFileDescriptorType(graph[it.second].type)) {
-				graph[it.second].filedescriptor = true;
+		} else if (calledFunction && isa<Function>(calledFunction)) {
+			// Function is in another SCC - there must be summary edges
+			auto vCall = graph.getVertex(&ins);
+			auto vFunc = graph.getVertex(calledFunction);
+			// function signature nodes -> callside nodes. We expect structural equivalence (in terms of parameters / return value structure)
+			std::map<Vertex, Vertex> matching;
+			// params
+			for (unsigned int i = 0; i < call.getNumArgOperands(); i++) {
+				if (isIgnoredOperand(call.getArgOperand(i))) continue;
+				if (calledFunction->isVarArg() && i >= calledFunction->arg_size()) {
+					auto vFuncParam = graph.getParamOpt(vFunc, calledFunction->arg_size());
+					if (vFuncParam) {
+						matchSubnodes(matching, *vFuncParam, graph.getVertex(call.getArgOperand(i), function));
+						// hack, since we have no vararg types on callee side
+						if (graph[*vFuncParam].reaches_ipc_sink) {
+							markSubnodesReachingIpc(graph.getVertex(call.getArgOperand(i), function));
+						}
+					}
+				} else {
+					auto vFuncParam = graph.getParamOpt(vFunc, i);
+					if (vFuncParam)
+						matchSubnodes(matching, *vFuncParam, graph.getVertex(call.getArgOperand(i), function));
+				}
 			}
-			for (const auto &e: graph.out_edges(it.first)) {
-				if (graph[e].type == PDGEdge::Summary_Equals || graph[e].type == PDGEdge::Summary_Data) {
-					const auto &callsideDest = matching.find(e.target);
-					if (callsideDest != matching.end()) {
-						graph.add_edge(it.second, callsideDest->second,
-									   PDGEdge{.type=(graph[e].type == PDGEdge::Summary_Equals ? PDGEdge::Equals : PDGEdge::Data), .index=0});
+			// return value
+			auto vFuncRet = graph.getReturnOpt(vFunc);
+			if (vFuncRet)
+				matchSubnodes(matching, *vFuncRet, vCall);
+
+			// copy summary edges and ipcsink property
+			for (const auto &it: matching) {
+				if (graph[it.first].reaches_ipc_sink || graph[it.first].ipcsink) {
+					graph[it.second].reaches_ipc_sink = true;
+				}
+				if (graph[it.first].filedescriptor && isFileDescriptorType(graph[it.second].type)) {
+					graph[it.second].filedescriptor = true;
+				}
+				for (const auto &e: graph.out_edges(it.first)) {
+					if (graph[e].type == PDGEdge::Summary_Equals || graph[e].type == PDGEdge::Summary_Data) {
+						const auto &callsideDest = matching.find(e.target);
+						if (callsideDest != matching.end()) {
+							graph.add_edge(it.second, callsideDest->second,
+										   PDGEdge{.type=(graph[e].type == PDGEdge::Summary_Equals ? PDGEdge::Equals : PDGEdge::Data), .index=0});
+						}
+					}
+					// Invocations of function pointer parameters?
+					if (graph[e].type == PDGEdge::Invocation || graph[e].type == PDGEdge::Summary_Invocation) {
+						// add dummy call node, link to current call
+						auto dummyCallNode = graph.createDummyVertex(&call, call.getFunction());
+						graph.add_edge(it.second, dummyCallNode, PDGEdge{.type=PDGEdge::Invocation, .index=0});
+						// copy all parameter edges
+						for (const auto &e2: graph.in_edges(e.target)) {
+							if (graph[e2].type == PDGEdge::Param) {
+								auto it2 = matching.find(e2.source);
+								if (it2 != matching.end()) {
+									// copy/summarize Param edge
+									graph.add_edge(it2->second, dummyCallNode, PDGEdge{.type=PDGEdge::Param, .index=graph[e2].index});
+								}
+							}
+						}
 					}
 				}
 			}
 		}
 
-	}
+		// Check if function needs to be marked
+		if (calledFunction) {
+			if (graph[graph.getVertex(calledFunction)].ipcfunction)
+				markIpcCall(&call);
+		}
+	};
 
-	// Check if function needs to be marked
-	if (calledFunction) {
-		if (graph[graph.getVertex(calledFunction)].ipcfunction)
-			markIpcCall(&call);
-	} else {
-		// outs() << "Can't handle function call: " << ins << "\n";
+	auto calledFunction = getCalledFunction(call);
+	handleCallTarget(calledFunction);
+	if (!calledFunction) {
+		// Indirect call
+		if (config->strongFPAnalysis) {
+			auto &graph = *pdg;
+			for (auto calledFunction: *sccpass->getPossibleIndirectFunctions(&call)) {
+				if (!calledFunction->hasName() || graph[graph.getVertex(calledFunction)].function == nullptr) {
+					llvm::errs() << "[WARN] invalid function: " << calledFunction->isDeclaration() << " | " << *calledFunction << "\n";
+				} else {
+					handleCallTarget(calledFunction);
+				}
+			}
+		}
 		indirectCalls.push_back(&call);
 	}
 }
@@ -232,6 +274,13 @@ bool PDGReachabilityPass::addKnownFunctionSummary(llvm::Function *calledFunction
 		if (srcMemory && dstMemory)
 			pdg->addSubnodeEdges(*srcMemory, *dstMemory);
 		// outs() << "    Handling memcpy: " << call << "\n";
+		return true;
+	}
+	if (calledFunction->getName() == "realloc") {
+		auto srcMemory = pdg->getDerefOpt(pdg->getVertex(call.getArgOperand(0)));
+		auto dstMemory = pdg->getDerefOpt(pdg->getVertex(&call));
+		if (srcMemory && dstMemory)
+			pdg->addSubnodeEdges(*srcMemory, *dstMemory);
 		return true;
 	}
 	//*
@@ -360,8 +409,61 @@ void PDGReachabilityPass::calculateSummaryEdges(std::set<Function *> &functions)
 
 		void finished(PDG &graph) {
 			edge_count += new_edges.size();
-			for (auto &target: new_edges)
+			auto derefStart = graph.getDerefOpt(start);
+			for (auto &target: new_edges) {
 				graph.add_edge(start, target, PDGEdge{.type=PDGEdge::Summary_Data, .index=0});
+				// Workaround - if a data-flows to b and *b is shared, then *a must also be shared.
+				if (derefStart && !graph[*derefStart].reaches_ipc_sink) {
+					auto derefTarget = graph.getDerefOpt(target);
+					if (derefTarget && (graph[*derefTarget].reaches_ipc_sink || graph[*derefTarget].ipcsink)) {
+						markAsShared(graph, *derefStart);
+					}
+				}
+			}
+		}
+	};
+
+	struct InvocationSummaryVisitor : public basegraph::default_bfs_visitor<PDG> {
+		Vertex start;
+		std::set<Vertex> &nodes;
+		std::set<Function *> &functions;
+		std::vector<Vertex> new_edges_invoke;
+		long &edge_count;
+
+		InvocationSummaryVisitor(Vertex start, std::set<Vertex> &nodes, std::set<Function *> &functions, long &edge_count)
+				: start(start), nodes(nodes), functions(functions), edge_count(edge_count) {}
+
+		inline bool examine_forwards_edge(Edge e, const PDG &graph) {
+			return graph[e].type == PDGEdge::Data; // || graph[e].type == PDGEdge::Summary_Data;
+		}
+
+		inline bool examine_backwards_edge(Edge e, const PDG &graph) {
+			return false;
+		}
+
+		inline bool discover_vertex(Vertex v, PDG &graph) {
+			if (v != start) {
+				if (nodes.find(v) != nodes.end()) {
+					// Summary edge: From summary node to any other call instruction (not necessarily summary node)
+					for (const auto &e: graph.out_edges(v)) {
+						if (graph[e].type == PDGEdge::Invocation) {
+							new_edges_invoke.push_back(e.target);
+						}
+					}
+				} else {
+					// search only within SCC
+					auto f = graph[v].function;
+					if (f && functions.find(f) == functions.end())
+						return false;
+				}
+			}
+			return true;
+		}
+
+		void finished(PDG &graph) {
+			edge_count += new_edges_invoke.size();
+			for (auto &target: new_edges_invoke)
+				graph.add_edge(start, target, PDGEdge{.type=PDGEdge::Summary_Invocation, .index=0});
 		}
 	};
 
@@ -370,6 +472,10 @@ void PDGReachabilityPass::calculateSummaryEdges(std::set<Function *> &functions)
 	for (auto v: nodes) {
 		// actually: forward search, taking backward "=" edges into account
 		breadth_first_search_forward(graph, DataSummaryVisitor(v, nodes, functions, edge_count), v, *colors);
+		if (config->strongFPAnalysis) {
+			if (graph[v].type->isPointerTy() || graph[v].type->isFunctionTy())
+				breadth_first_search_forward(graph, InvocationSummaryVisitor(v, nodes, functions, edge_count), v, *colors);
+		}
 #ifndef SILENT
 		if (nodes.size() > 10000) {
 			// break; //TODO hack
@@ -427,10 +533,12 @@ void PDGReachabilityPass::matchSubnodes(std::map<Vertex, Vertex> &map, Vertex ke
 
 void PDGReachabilityPass::markSubnodesReachingIpc(Vertex root) {
 	auto &graph = *pdg;
-	graph[root].reaches_ipc_sink = true;
-	for (const auto &e: graph.out_edges(root)) {
-		if (graph[e].type == PDGEdge::Deref || graph[e].type == PDGEdge::Part) {
-			markSubnodesReachingIpc(e.target);
+	if (!graph[root].reaches_ipc_sink) {
+		graph[root].reaches_ipc_sink = true;
+		for (const auto &e: graph.out_edges(root)) {
+			if (graph[e].type == PDGEdge::Deref || graph[e].type == PDGEdge::Part) {
+				markSubnodesReachingIpc(e.target);
+			}
 		}
 	}
 }
@@ -447,25 +555,6 @@ void PDGReachabilityPass::markIpcCall(InstTy *call) {
 			continue;
 		auto v2 = pdg->getVertex(arg.get());
 		pdg->add_edge(v2, v, PDGEdge{.type = PDGEdge::Param, .index=arg.getOperandNo()});
-		markAsPointerToShared(v2);
-	}
-}
-
-void PDGReachabilityPass::markAsPointerToShared(Vertex v) {
-	auto &graph = *pdg;
-	for (const auto &e: graph.out_edges(v)) {
-		if (graph[e].type == PDGEdge::Deref)
-			markAsShared(e.target);
-		else if (graph[e].type == PDGEdge::Part)
-			markAsPointerToShared(e.target);
-	}
-}
-
-void PDGReachabilityPass::markAsShared(Vertex v) {
-	auto &graph = *pdg;
-	graph[v].ipcsink = true;
-	for (const auto &e: graph.out_edges(v)) {
-		if (graph[e].type == PDGEdge::Deref || graph[e].type == PDGEdge::Part)
-			markAsShared(e.target);
+		markAsPointerToShared(*pdg, v2);
 	}
 }

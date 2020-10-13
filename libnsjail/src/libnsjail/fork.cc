@@ -2,6 +2,7 @@
 #include <sys/prctl.h>
 #include <signal.h>
 #include <string.h>
+#include <nsjail/logs.h>
 
 #include "fork.h"
 #include "nsjail/cmdline.h"
@@ -37,12 +38,20 @@ void nsjail_print_default_config(void) {
 std::unique_ptr<struct nsjconf_t> nsjail_default_config() {
 	// const char* params[] = {"???", "-Mo", "--chroot", "/", "--user", "65534", "--group", "65534", "--", "/usr/bin/id", 0};
 
-	char **params_heap = (char**) malloc(sizeof default_commandline);
-	memcpy(params_heap, default_commandline, sizeof default_commandline);
+	//char **params_heap = (char**) malloc(sizeof default_commandline);
+	//memcpy(params_heap, default_commandline, sizeof default_commandline);
 	// printf("Params: %zu\n", sizeof params / sizeof params[0] -1);
-	auto conf = cmdline::parseArgs(sizeof default_commandline / sizeof default_commandline[0] - 1, params_heap);
-	conf->execute_function = nullptr;
+	//auto conf = cmdline::parseArgs(sizeof default_commandline / sizeof default_commandline[0] - 1, params_heap);
+
+	auto conf = cmdline::parseArgs(0, nullptr);
 	if (!conf) fprintf(stderr, "Error parsing fake cmd!");
+	conf->mode = MODE_STANDALONE_ONCE;
+	conf->chroot = "/dev/shm";
+	conf->clone_newipc = false;
+	conf->keep_caps = true;
+	conf->keep_env = true;
+	conf->tlimit = 0;
+	conf->execute_function = nullptr;
 	return conf;
 }
 
@@ -52,7 +61,7 @@ void addParentDependency() {
 }
 
 void nsjail_run_jailed(struct nsjconf_t *nsjconf, callback_function_ptr process) {
-
+	logs::logLevel(logs::WARNING);
 	nsjconf->execute_function = process;
 
 	if (!nsjconf->clone_newuser && geteuid() != 0) {
@@ -82,14 +91,28 @@ void nsjail_run_jailed(struct nsjconf_t *nsjconf, callback_function_ptr process)
 }
 
 
-pid_t nsjail_fork(struct nsjconf_t *nsjconf, callback_function_ptr process) {
+void attach_gdb(pid_t pid) {
+	char buffer[1024];
+	sprintf(buffer, "sudo gnome-terminal -- gdb %s %d", program_invocation_name, pid);
+	if (system(buffer))
+		perror("system gdb");
+}
+
+
+pid_t nsjail_fork(struct nsjconf_t *nsjconf, callback_function_ptr process, void(*on_parent_exit_callback)(int)) {
 	//nsjail_test();
 	pid_t child = fork();
 	if (child == -1) perror("fork()");
 	else if (child == 0) {
 		// Child process
 		addParentDependency();
+		if (on_parent_exit_callback)
+			signal(SIGTERM, on_parent_exit_callback);
 		nsjail_run_jailed(nsjconf, process);
+		on_parent_exit_callback(0);
+		/*if (!nsjconf->pids.empty() && getenv("CALI_ATTACH_GDB")) {
+			attach_gdb(nsjconf->pids[0].pid);
+		}*/
 		exit(0);
 	}
 	return child;

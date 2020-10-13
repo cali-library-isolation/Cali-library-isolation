@@ -8,7 +8,7 @@
 #include "ipc_constants.h"
 #include "file_descriptor_manager.h"
 
-
+class SharedMutex;
 typedef void (*ipc_call_processor)(void*);
 typedef void (*nsjail_configurator)(struct nsjconf_t*);
 #define process_local
@@ -20,6 +20,8 @@ public:
 	void (*wrapper)(void* cb, void* receiving, void* sending);
 
 	CallbackEntry(void *callback, void (*wrapper)(void *, void *, void *)) : callback(callback), wrapper(wrapper) {}
+
+	explicit CallbackEntry(uintptr_t number) : callback((void *) number), wrapper((void (*)(void*, void*, void*)) number) {}
 
 };
 
@@ -65,6 +67,7 @@ private:
 	key_t receiving_semaphore;
 	int ipc_count = 0;
 	bool is_library = false;
+	bool is_forked = false;
 
 	ipc_call_processor processor;
 	ipc_call_processor library_processor;
@@ -80,6 +83,8 @@ public:
 
 	void* sending_data;
 	void* receiving_data;
+	bool sending_is_blocked = false;
+	SharedMutex* sending_lock = nullptr; // Lock the "process calls into library" direction (optional)
 
 	/**
 	 * Dispatches an IPC call, but does not wait for it to return. A call to trigger_ipc_call() should be followed by
@@ -105,6 +110,12 @@ public:
 	inline int share_fd(int fd) {
 		return fileDescriptors.mapToOtherSide(fd);
 	}
+
+	void printStats();
+
+	void terminate();
+
+	void sending_lock_lock() const;
 };
 
 

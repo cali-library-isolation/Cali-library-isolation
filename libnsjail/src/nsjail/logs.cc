@@ -47,7 +47,7 @@ static bool _log_set = false;
 
 static void setDupLogFdOr(int fd, int orfd) {
 	int saved_errno = errno;
-	_log_fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+	_log_fd = fcntl(fd, F_DUPFD_CLOEXEC, 1023);
 	if (_log_fd == -1) {
 		_log_fd = fcntl(orfd, F_DUPFD_CLOEXEC, 0);
 	}

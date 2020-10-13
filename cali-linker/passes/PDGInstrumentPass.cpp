@@ -27,7 +27,7 @@ llvm::ConstantInt *PDGInstrumentPass::getInt64(llvm::Module &M, uint64_t value) 
 	return ConstantInt::get(Type::getInt64Ty(M.getContext()), value);
 }
 
-bool PDGInstrumentPass::prepareStubs(llvm::Module &M) {
+void PDGInstrumentPass::prepareStubs(llvm::Module &M) {
 	Type *tVoid = Type::getVoidTy(M.getContext());
 	Type *tInt64 = Type::getInt64Ty(M.getContext());
 	// void insInit();

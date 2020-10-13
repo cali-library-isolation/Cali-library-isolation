@@ -18,6 +18,7 @@ namespace ipcrewriter {
 
 	public:
 		std::vector<std::string> new_files;
+		std::vector<std::string> new_arguments;
 
 		void addModule(std::shared_ptr<IpcModule> module);
 
@@ -26,6 +27,8 @@ namespace ipcrewriter {
 		void createCommunicationPair(IpcModule& m1, IpcModule& m2, const ContextConfig* permissions, const YamlConfig* config);
 
 		void saveAllModules(const std::string &basepath);
+
+		void saveLogEntries(const std::string &fname);
 	};
 
 }

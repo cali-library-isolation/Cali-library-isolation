@@ -177,6 +177,11 @@ namespace basegraph {
 			size--;
 			free_vertices.push(v);
 		}
+
+		inline void remove_edge(Edge e) {
+			if (vertices[e.source].out_edges.remove(e) & vertices[e.target].in_edges.remove(e))
+				edge_size--;
+		}
 	};
 
 };

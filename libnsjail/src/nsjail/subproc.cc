@@ -418,6 +418,17 @@ static bool initParent(nsjconf_t* nsjconf, pid_t pid, int pipefd) {
 	return true;
 }
 
+	void attach_gdb(pid_t pid, bool cont) {
+		char buffer[1024];
+		if (cont) {
+			sprintf(buffer, "sudo gnome-terminal -- gdb %s %d -ex 'set confirm on' -ex continue", program_invocation_name, pid);
+		} else {
+			sprintf(buffer, "sudo gnome-terminal -- gdb %s %d", program_invocation_name, pid);
+		}
+		if (system(buffer))
+			perror("system gdb");
+	}
+
 bool runChild(nsjconf_t* nsjconf, int fd_in, int fd_out, int fd_err) {
 	if (!net::limitConns(nsjconf, fd_in)) {
 		return true;
@@ -481,6 +492,11 @@ bool runChild(nsjconf_t* nsjconf, int fd_in, int fd_out, int fd_err) {
 		close(parent_fd);
 		return false;
 	}
+
+	if (getenv("CALI_ATTACH_GDB")) {
+		attach_gdb(pid, getenv("CALI_ATTACH_GDB_CONTINUE") != nullptr);
+	}
+	// fprintf(stderr, "Library / Intermediate process: %d / %d\n", nsjconf->pids[0].pid, getpid());
 
 	char rcvChar;
 	if (util::readFromFd(parent_fd, &rcvChar, sizeof(rcvChar)) == sizeof(rcvChar) &&

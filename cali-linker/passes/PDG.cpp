@@ -73,6 +73,21 @@ Vertex PDG::createVertex(llvm::Value *value, llvm::Function *function) {
 	return newNode;
 }
 
+Vertex PDG::createDummyVertex(llvm::Value *value, llvm::Function *function) {
+	if (!function && value && llvm::isa<llvm::Instruction>(value)) {
+		function = llvm::cast<llvm::Instruction>(value)->getFunction();
+	}
+	PDGNode n;
+	n.instruction = value;
+	// Functions are always contained in themselves - no matter where they occur first
+	n.function = (value && llvm::isa<llvm::Function>(value)) ? llvm::cast<llvm::Function>(value) : function;
+	n.type = value->getType();
+	n.source = false; // set by PDGCreationPass
+	n.source_type = 0;
+	n.dummy = true;
+	return pdg_add_vertex(n);
+}
+
 boost::optional<Vertex> PDG::getVertexOpt(const llvm::Value *value) {
 	auto it = value_to_vertex.find(value);
 	if (it != value_to_vertex.end())
@@ -109,6 +124,14 @@ boost::optional<Vertex> PDG::getParamOpt(Vertex v, unsigned int index) {
 	for (const auto &e: out_edges(v)) {
 		if ((*this)[e].type == PDGEdge::Param && (*this)[e].index == index)
 			return e.target;
+	}
+	return {};
+}
+
+boost::optional<Vertex> PDG::getCallParamOpt(Vertex v, unsigned int index) {
+	for (const auto &e: in_edges(v)) {
+		if ((*this)[e].type == PDGEdge::Param && (*this)[e].index == index)
+			return e.source;
 	}
 	return {};
 }
@@ -221,6 +244,8 @@ void PDG::uniteSubnodes(Vertex v1, Vertex v2) {
 		}
 		if (!v1Property.ipcsink && v2Property.ipcsink)
 			v1Property.ipcsink = v2Property.ipcsink;
+		if (!v1Property.reaches_ipc_sink && v2Property.reaches_ipc_sink)
+			v1Property.reaches_ipc_sink = v1Property.reaches_ipc_sink;
 		if (!v1Property.filedescriptor && v2Property.filedescriptor)
 			v1Property.filedescriptor = v2Property.filedescriptor;
 		if (v2Property.instruction) {
@@ -298,6 +323,7 @@ void PDG::removeFunction(llvm::Function *function) {
 		if (it != value_to_vertex.end() && it->second == v) {
 			value_to_vertex.erase(it);
 		}
+		remove_vertex(v);
 	}
 	set.clear();
 }
@@ -309,7 +335,7 @@ boost::optional<Vertex> PDG::getMemoryForSource(Vertex src) {
 			// malloc style
 			return getDerefOpt(src);
 		case 2: {
-			auto v = getParamOpt(src, 0);
+			auto v = getCallParamOpt(src, 0);
 			if (v) {
 				v = getDerefOpt(*v);
 				if (v)
@@ -328,8 +354,8 @@ void PDG::checkIfFDMarkerIsInteresting(Vertex v) {
 			auto st = (*this)[e.source].type;
 			if (st && st->isStructTy()) {
 				// look up cluster
-				auto cluster = structClusters.find((const llvm::StructType *) st);
-				if (cluster != structClusters.end()) {
+				auto cluster = structClusters->find((const llvm::StructType *) st);
+				if (cluster != structClusters->end()) {
 					structClusterToKnownFDFields[cluster->second].insert((*this)[e].index);
 				}
 			}

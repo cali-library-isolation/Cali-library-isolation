@@ -1,0 +1,27 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+
+contexts:
+  main:
+    instrument: false
+    instrumentCoverage: false
+    selectors:
+      - "*.o"
+  library:
+    selectors:
+      - "libtest.so"
+    permissions:
+      readonly:
+        - /
+        - /home
+        - /bin
+        - /usr
+        - /lib
+        - /lib64
+        - /etc
+        - /dev
+      readwrite:
+        - /tmp
+      network: host

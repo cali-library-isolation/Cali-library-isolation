@@ -1,0 +1,7 @@
+*.o
+*.bc
+*.bc.dot
+*.so
+test*-cali
+test*-ref
+.gdb_history

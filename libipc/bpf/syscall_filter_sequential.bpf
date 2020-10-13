@@ -1,0 +1,44 @@
+/* bpfc -i syscall_filter_sequential.bpf -f C -p | sed 's|0x1234|bpf_ident_|' > syscall_filter_sequential.h */
+
+#include "seccomp_constants.h"
+#include <sys/syscall.h>
+
+#define __start_text_mprotect_lo #0x12340001
+#define __start_text_mprotect_hi #0x12340002
+#define __stop_text_mprotect_lo  #0x12340003
+#define __stop_text_mprotect_hi  #0x12340004
+#define __start_text_lo #0x12340011
+#define __start_text_hi #0x12340012
+#define __stop_text_lo  #0x12340013
+#define __stop_text_hi  #0x12340014
+#define fd_shared_memory  #0x12340020
+
+
+
+; 0 = syscall nr
+; 4 = architecture
+; 8 = instruction_pointer
+; 16 = arg1
+; 24 = arg2
+; 32 = arg3
+; 40 = arg4
+; 48 = arg5
+; 56 = arg6
+
+
+ld [4]  ; load architecture
+jne #AUDIT_ARCH_X86_64, bad
+
+ld [0]  ; load syscall number
+jeq #SYS_clone, bad
+jeq #SYS_fork,  bad
+jeq #SYS_vfork, bad
+jmp good
+
+
+good:
+  ret #SECCOMP_RET_ALLOW
+
+bad:
+  ret #SECCOMP_RET_TRAP
+  ret #SECCOMP_RET_KILL

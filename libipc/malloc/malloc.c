@@ -410,10 +410,21 @@ __malloc_assert (const char *assertion, const char *file, unsigned int line,
 
 
 /* Definition for getting more memory from the OS.  */
-#define MORECORE         (*__morecore)
 #define MORECORE_FAILURE 0
+// TODO PATCH: MORECORE (sbrk) is disabled because our memory is not coming from the data segment.
+/*#define MORECORE         (*__morecore)
 void * __default_morecore (ptrdiff_t);
 void *(*__morecore)(ptrdiff_t) = __default_morecore;
+ */
+static inline void* shm_no_morecore(ptrdiff_t x) {
+	/* if (x != 0) {
+		fprintf(stderr, "=============================================\n");
+		fprintf(stderr, "hitting morecore ... 0x%lx\n", x);
+		fprintf(stderr, "=============================================\n");
+	} */
+	return MORECORE_FAILURE;
+}
+#define MORECORE shm_no_morecore
 
 
 #include <string.h>
@@ -1759,7 +1770,7 @@ struct malloc_par
    before using. This malloc relies on the property that malloc_state
    is initialized to all zeroes (as is true of C statics).  */
 
-static struct malloc_state main_arena =
+/*static struct malloc_state main_arena =
 {
 	 //.mutex = _LIBC_LOCK_INITIALIZER,
 	 .mutex = {{0}},
@@ -1776,7 +1787,20 @@ static struct malloc_state main_arena =
      .next_free = 0,
      .system_mem = 0,
      .max_system_mem = 0
-};
+};*/
+
+struct malloc_state *main_arena_ptr = 0;
+#define main_arena (*main_arena_ptr)
+void init_shm_malloc(void* ptr) {
+	main_arena_ptr = ptr;
+	bzero(main_arena_ptr, sizeof(struct malloc_state));
+	// main_arena_ptr->mutex = _LIBC_LOCK_INITIALIZER, //TODO which one?
+	// main_arena_ptr->mutex = {{0}};
+	mutex_init(&main_arena_ptr->mutex);
+	main_arena_ptr->next = main_arena_ptr;
+	main_arena_ptr->attached_threads = 1;
+}
+
 
 /* There is only one instance of the malloc parameters.  */
 
@@ -1786,7 +1810,9 @@ static struct malloc_par mp_ =
   .n_mmaps_max = DEFAULT_MMAP_MAX,
   .mmap_threshold = DEFAULT_MMAP_THRESHOLD,
   .trim_threshold = DEFAULT_TRIM_THRESHOLD,
-#define NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))
+  // TODO PATCH MOD: we allow only one arena (for now), so that new threads do not have to use mmap (which is dangerous if the communication is blocked)
+//#define NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))
+#define NARENAS_FROM_NCORES(n) (1)
   .arena_test = NARENAS_FROM_NCORES (1)
 };
 

@@ -19,7 +19,11 @@ struct PDGNodeWriter {
 		PDGNode &node = pdg[v];
 		std::string str;
 		llvm::raw_string_ostream rso(str);
-		if (node.instruction) {
+		if (node.dummy) {
+			rso << "dummy";
+			if (node.instruction) rso << node.instruction->getName();
+			rso << " : ";
+		} else if (node.instruction) {
 			if (llvm::isa<llvm::Function>(node.instruction)) {
 				rso << "Function \"" << node.instruction->getName() << "\"";
 			} else {
@@ -78,11 +82,17 @@ struct PDGEdgeWriter {
 			case PDGEdge::Return:
 				out << "ret";
 				break;
+			case PDGEdge::Invocation:
+				out << "invoke";
+				break;
 			case PDGEdge::Summary_Data:
 				out << "s[data]\" penwidth=2 color=\"forestgreen";
 				break;
 			case PDGEdge::Summary_Equals:
 				out << "s[=]\" penwidth=2 color=\"forestgreen";
+				break;
+			case PDGEdge::Summary_Invocation:
+				out << "s[invoke]\" penwidth=2 color=\"forestgreen";
 				break;
 		}
 		out << "\"]";
@@ -94,6 +104,18 @@ struct PDGFunctionFilter {
 	std::set<llvm::Function *> functions;
 
 	inline bool operator()(PDG &pdg, Vertex v) {
+		/*if (pdg[v].instruction && llvm::isa<llvm::CallInst>(pdg[v].instruction)) {
+			llvm::errs() << "- " << v << " ";
+			llvm::errs() << pdg[v].instruction << " ";
+			if (pdg[v].function){
+				llvm::errs() << " (func " << pdg[v].function->getName() << ") ";
+				if (pdg[v].function->getName().empty()) llvm::errs() << *pdg[v].function;
+			}
+			llvm::errs() << *pdg[v].type << " | ";
+			llvm::errs() << *pdg[v].instruction << "\n";
+		}*/
+		if (pdg[v].function && pdg[v].function->getName().empty())
+			return false;
 		// Ignore debug info
 		if (pdg[v].instruction && llvm::isa<llvm::CallInst>(pdg[v].instruction) &&
 			llvm::cast<llvm::CallInst>(pdg[v].instruction)->getCalledFunction() &&
@@ -156,6 +178,7 @@ bool PDGWriterPass::runOnModule(llvm::Module &M) {
 				"GetConfigurePaths",
 				"GetLocaleOptions",
 				"ConstantString",
+				"ReadOnePNGImage", "Magick_png_malloc", "ReadPNGImage",
 				// socat
 				"_xioopen_openssl_prepare",
 				"sycSSL_CTX_load_verify_locations",
@@ -176,7 +199,27 @@ bool PDGWriterPass::runOnModule(llvm::Module &M) {
 				"_ZN13CQueueStorage4Impl4BindEP12sqlite3_stmtiRKNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE",
 				"_ZN13CQueueStorage4Impl8SaveFileERK9CFileItem",
 				"_ZN13CQueueStorage4Impl10SaveServerERK11CServerItem",
-				"_ZN13CQueueStorage4Impl13SaveDirectoryERK11CFolderItem"
+				"_ZN13CQueueStorage4Impl13SaveDirectoryERK11CFolderItem",
+				// git
+				"inflate", "git_inflate",
+				"deflate", "git_deflate",
+				"unpack_compressed_entry",
+				"use_pack",
+				"write_loose_object", "write_object_file", "commit_tree_extended", "strbuf_init", "strbuf_addf",
+				"read_istream", "read_istream_loose", "read_istream_filtered", "stream_blob_to_fd", "streaming_write_entry",
+				"open_istream", "attach_stream_filter",
+				"map_sha1_file", "sha1_loose_object_info", "sha1_object_info_extended", "map_sha1_file_1", "xmmap", "git_inflate", "git_inflate_init",
+				// dpkg
+				"extracthalf", "decompress_filter", "compressor", "decompress_gzip",
+				// mandb
+				"copy_datum", "man_gdbm_nextkey", "sanity_check_db", "man_gdbm_open_wrapper", "process_manpath", "xasprintf", "xvasprintf",
+				"test_manfile", "store_descriptions", "dbstore", "make_content",
+				// xz
+				"coder_set_compression_settings", "test_delta", "test_bcj", "encode", "decode", "decode_ret", "main",
+				// gpg
+				"xmalloc_clear", "init_uncompress", "compress_filter", "push_compress_filter2", "do_compress", "init_compress", "filter_flush", "iobuf_close",
+				"gpgsql_stepx", "sqlite3_bind_text", "record_binding",/* "get_policy", "get_trust", */"add_to_strlist", "build_conflict_set", "strings_collect_cb2",
+				"import_one", "gnupg_ksba_create_reader", "init_dek", "gpgsm_encrypt"
 		};
 		for (const auto &fn: functionNames) {
 			filter.functions.insert(M.getFunction(fn));

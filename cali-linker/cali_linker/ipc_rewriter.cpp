@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "ipc_rewriter.h"
 #include "../modules/ipc_module.h"
+#include "randomness.h"
 
 #include <boost/filesystem.hpp>
 
@@ -35,7 +36,14 @@ namespace ipcrewriter {
 	}
 
 	void IpcRewriter::createCommunicationPair(IpcModule &m1, IpcModule &m2, const ContextConfig *contextConfig, const YamlConfig *config) {
-		auto cmp = make_shared<CommunicationPair>(&m1, &m2);
+		auto cmp = make_shared<CommunicationPair>(&m1, &m2, m1.contextConfig->concurrentLibraryCommunication || m2.contextConfig->concurrentLibraryCommunication);
+		if (!m1.contextConfig->instrument_user.empty()) {
+			cmp->loadUserInstrumentation(m1.contextConfig->instrument_user);
+		}
+		if (!m2.contextConfig->instrument_user.empty()) {
+			cmp->loadUserInstrumentation(m2.contextConfig->instrument_user);
+		}
+		cmp->initModule();
 		if (contextConfig) {
 			cmp->setNsjailConfig(&contextConfig->permissions);
 		}
@@ -59,10 +67,40 @@ namespace ipcrewriter {
 
 		new_files.clear();
 		for (auto &c : communications) {
-			auto rnd = std::rand();
-			auto fname = filesystem::path(basepath).append("communication-" + to_string(c->getId()) + "-" + to_string(rnd) + ".bc");
+			auto fname = filesystem::path(basepath).append("communication-" + to_string(c->getId()) + "-" + getRandomString() + ".bc");
 			c->save(fname.string());
 			new_files.push_back(fname.string());
+			for (auto &s: c->newArguments) {
+				new_files.push_back(s);
+			}
+		}
+	}
+
+	void IpcRewriter::saveLogEntries(const string &fname) {
+		bool has_logs = false;
+		for (auto &m: modules) {
+			if (!m->getLogEntries().empty()) {
+				has_logs = true;
+				break;
+			}
+		}
+		for (auto &c: communications) {
+			if (!c->getLogEntries().empty()) {
+				has_logs = true;
+				break;
+			}
+		}
+		if (!has_logs) return;
+		ofstream f(fname, ios::out | ios::trunc);
+		for (auto &m: modules) {
+			for (auto &s: m->getLogEntries()) {
+				f << s << "\n";
+			}
+		}
+		for (auto &c: communications) {
+			for (auto &s: c->getLogEntries()) {
+				f << s << "\n";
+			}
 		}
 	}
 

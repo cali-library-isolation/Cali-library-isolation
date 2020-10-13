@@ -6,9 +6,11 @@
 #include <ipc_constants.h>
 #include <shm_malloc.h>
 #include <cstring>
+#include "../../libipc/ipc_communication.h"
 
 typedef struct __ipc_data {
 	unsigned int code;
+	int libc_errno;
 	void *callbacknumber;
 	void *data;
 } __ipc_data;
@@ -23,7 +25,7 @@ static void nsjail_configure(struct nsjconf_t *conf) asm ("nsjail_configure");
 void *__unused_stuff_for_nsjail_configure();
 
 __attribute__((constructor))
-void getArguments(int argc, const char* argv[]) {
+void getArguments(int argc, const char *argv[]) {
 	nsjail_argc = argc;
 	nsjail_argv = argv;
 }
@@ -65,6 +67,13 @@ int ipc_share_fd(int fd) {
 	return communication.share_fd(fd);
 }
 
+__attribute__((always_inline))
+void ipc_lock_sending(void) asm("ipc_lock_sending");
+void ipc_lock_sending(void) {
+	if (communication.sending_lock)
+		communication.sending_lock_lock();
+}
+
 
 
 
@@ -77,7 +86,7 @@ static void process_ipc_call_1(__ipc_data *receiving) {
 		case 3:
 			break;
 		default:
-			fprintf(stderr, "[IPC ERROR] Invalid function (%d)\n", receiving->code);
+			fprintf(stderr, "[IPC ERROR] Invalid function (%d) in process %d\n", receiving->code, getpid());
 	}
 	sending->code = 1;
 }
@@ -91,7 +100,7 @@ static void process_ipc_call_2(__ipc_data *receiving) {
 		case 3:
 			break;
 		default:
-			fprintf(stderr, "[IPC ERROR] Invalid function (%d)\n", receiving->code);
+			fprintf(stderr, "[IPC ERROR] Invalid function (%d) in process %d\n", receiving->code, getpid());
 	}
 	sending->code = 1;
 }
@@ -145,15 +154,68 @@ void *wrap_outgoing_valist(void *list) {
 
 
 
+//#define MAX_STACKVAR_SIZE 1536
+#define MAX_STACKVAR_SIZE 4096
+#define MAX_STACKVAR_OFFSET 8192u
+
 void *wrap_pointer_from_callback(void *ptr) {
 	char c;
 	size_t diff = (char *) ptr - &c;
-	if (diff < 4096u) {
-		void *ptr2 = shm_malloc(1024);
-		memcpy(ptr2, ptr, 1024);
-		return ptr2;
+	if (diff < MAX_STACKVAR_OFFSET) {
+		void *newptr = ((char *) shm_malloc(MAX_STACKVAR_SIZE + 256)) + 128;
+		// fprintf(stderr, "malloc: %p\n", newptr);
+		memset((char *) newptr - 128, 0, 128);
+		memset((char *) newptr + MAX_STACKVAR_SIZE, 0, 128);
+		memmove(newptr, ptr, MAX_STACKVAR_SIZE);
+		return newptr;
 	}
 	return ptr;
+}
+
+static int iszero(void *memory, unsigned int size) {
+	unsigned char *mm = (unsigned char *) memory;
+	for (int i = 0; i < size; i++)
+		if (mm[i] != 0) return 0;
+	return 1;
+}
+
+void unwrap_pointer_from_callback(void *oldptr, void *newptr, int other_old, ...) {
+	if (oldptr != newptr && shm_is_shared_memory_pointer(newptr)) {
+		/*
+		if (!iszero((char*)newptr - 128, 128)) {
+			fprintf(stderr, "modification in [-128,0[ detected %p\n", newptr);
+		}
+		if (!iszero((char*)newptr + MAX_STACKVAR_SIZE, 128)) {
+			fprintf(stderr, "modification in [1024,+128[ detected %p\n", newptr);
+		}
+		 */
+		size_t size = MAX_STACKVAR_SIZE;
+		// fprintf(stderr, "other_old=%d\n", other_old);
+		if (other_old > 0) {
+			va_list valist;
+			va_start(valist, other_old);
+			for (int i = 0; i < other_old; i++) {
+				char *ptr = va_arg(valist, char * );
+				size_t diff = (char *) ptr - (char *) &size;
+				// fprintf(stderr, "ptr=%p diff=%lu ptr-oldptr=%ld\n", ptr, diff, ptr-(char*)oldptr);
+				if (diff < MAX_STACKVAR_OFFSET && ptr > oldptr) { // stack pointer & above the current one
+					if (ptr - (char *) oldptr < size) size = ptr - (char *) oldptr;
+					// fprintf(stderr, "size=%lu\n", size);
+				}
+				// fflush(stderr);
+			}
+			va_end(valist);
+		}
+
+		//fprintf(stderr, "memmove(%p => %p, %d)\n", newptr, oldptr, 1024);
+		unsigned char *o = (unsigned char *) oldptr;
+		unsigned char *n = (unsigned char *) newptr;
+		// fprintf(stderr, "[%d] 1 memmove(%p => %p, %ld)  (%02x, %02x, %02x, %02x) => (%02x, %02x, %02x, %02x)\n", getpid(), newptr, oldptr, size, n[0], n[1], n[2], n[3], o[0], o[1], o[2], o[3]);
+		memmove(oldptr, newptr, size);
+		// fprintf(stderr, "[%d] 2 memmove(%p => %p, %ld)  (%02x, %02x, %02x, %02x) => (%02x, %02x, %02x, %02x)\n", getpid(), newptr, oldptr, size, n[0], n[1], n[2], n[3], o[0], o[1], o[2], o[3]);
+		// fprintf(stderr, "restore: old=%p new=%p size=%ld\n", oldptr, newptr, size);
+		shm_free(((char *) newptr) - 128);
+	}
 }
 
 

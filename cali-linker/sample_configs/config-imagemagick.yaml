@@ -6,9 +6,15 @@ writeGraphsDot: false
 contexts:
   main:
     instrument: false
+    #instrumentUser: imagemagick
+    #instrumentCoverage: true
+    #mprotect_mode: true
     selectors:
       - "*.o"
       - "libMagick*.a"
+    function_behavior:
+      AcquireMagickMemory: malloc
+      RelinquishMagickMemory: free
   library:
     selectors:
       - "libgs.so"
@@ -22,6 +28,7 @@ contexts:
         #- /etc
         - /dev/urandom
         - /var/lib/ghostscript
+        - /usr
       readwrite:
         - "$ARGV_FOLDERS"
         - /tmp
