@@ -48,6 +48,8 @@ set(SOURCE_FILES
 		cali_linker/archive-wrapper.h
 		cali_linker/configfile.cpp
 		cali_linker/configfile.h
+		cali_linker/configfile_generator.cpp
+		cali_linker/configfile_generator.h
 		cali_linker/debug.h
 		cali_linker/ipc_rewriter.cpp
 		cali_linker/ipc_rewriter.h
@@ -82,12 +84,16 @@ set(SOURCE_FILES
 		passes/PDGReachabilityPass.h
 		passes/PDGSharedMemoryPass.cpp
 		passes/PDGSharedMemoryPass.h
+		passes/PDGSharedReachabilityPass.cpp
+		passes/PDGSharedReachabilityPass.h
 		passes/PDGSpecializationPass.cpp
 		passes/PDGSpecializationPass.h
 		passes/PDGUtilities.cpp
 		passes/PDGUtilities.h
 		passes/PDGWriterPass.cpp
 		passes/PDGWriterPass.h
+		passes/SimpleSharedAnalysisPass.cpp
+		passes/SimpleSharedAnalysisPass.h
 		stdlib-is-shit.h
 		cali_linker/randomness.cpp
 		cali_linker/randomness.h

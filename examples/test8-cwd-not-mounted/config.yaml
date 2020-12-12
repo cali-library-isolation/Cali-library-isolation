@@ -1,0 +1,20 @@
+---
+
+writeGraphs: false
+writeGraphsDot: false
+strongFPAnalysis: true
+
+contexts:
+  main:
+    instrument: false
+    selectors:
+      - "*.o"
+  library:
+    selectors:
+      - "libtest.so"
+    permissions:
+      readonly:
+        - /tmp
+      readwrite:
+        - /dev/shm
+      network: host

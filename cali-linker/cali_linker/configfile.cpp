@@ -42,6 +42,7 @@ namespace llvm {
 				io.mapOptional("instrument", config.instrument);
 				io.mapOptional("instrumentCoverage", config.instrument_coverage);
 				io.mapOptional("instrumentUser", config.instrument_user);
+				io.mapOptional("warnings", config.warnings);
 				io.mapOptional("mprotect_mode", config.mprotect_mode);
 				io.mapOptional("sequential_mode", config.sequential_mode);
 				io.mapOptional("programIsForking", config.programIsForking);
@@ -114,7 +115,7 @@ namespace llvm {
 // LLVM_YAML_IS_STRING_MAP(ContextConfig)
 
 
-YamlConfig YamlConfig::fromFile(std::string filename) {
+YamlConfig YamlConfig::fromFile(const std::string& filename) {
 	std::ifstream t(filename);
 	std::stringstream buffer;
 	buffer << t.rdbuf();
@@ -134,6 +135,17 @@ YamlConfig YamlConfig::fromFile(std::string filename) {
 	}*/
 
 	return config;
+}
+
+
+YamlConfig YamlConfig::empty() {
+	YamlConfig result;
+	result.contexts["main"] = ContextConfig();
+	result.contexts["main"].name = "main";
+	result.contexts["main"].selectors.emplace_back("*.o");
+	result.contexts["library"] = ContextConfig();
+	result.contexts["library"].name = "library";
+	return result;
 }
 
 

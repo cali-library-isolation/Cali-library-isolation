@@ -49,6 +49,7 @@ public:
 	bool instrument = false;
 	bool instrument_coverage = false;
 	std::string instrument_user = "";
+	bool warnings = false;
 
 	bool mprotect_mode = false;
 	bool sequential_mode = false;
@@ -64,7 +65,8 @@ class YamlConfig {
 public:
 	std::map<std::string, ContextConfig> contexts;
 
-	static YamlConfig fromFile(std::string filename);
+	static YamlConfig fromFile(const std::string& filename);
+	static YamlConfig empty();
 
 	bool writeGraphs = false;
 	bool writeGraphsDot = false;

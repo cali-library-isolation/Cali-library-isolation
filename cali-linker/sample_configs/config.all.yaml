@@ -7,8 +7,12 @@ writeGraphsDot: false
 
 limit_subnode_depth: 3
 limit_struct_parts: 32
+strongFPAnalysis: false
 strongFDAnalysis: false
 filedescriptors: {}  # Map ["function name" => argument number] to support FD detection
+
+replaceArguments: {}
+ignoreOutputs: []
 
 contexts:
   main:

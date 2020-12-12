@@ -7,6 +7,7 @@
 #include "../modules/ipc_module.h"
 #include "../stdlib-is-shit.h"
 #include "debug.h"
+#include "configfile_generator.h"
 
 
 filesystem::path applicationPath;
@@ -97,9 +98,31 @@ public:
 			}
 		}
 		if (configfile[0] != '/' && !filesystem::exists(configfile)) {
-			configfile = applicationPath.parent_path().parent_path().append("cali-linker").append("sample_configs").append(configfile).string();
+			auto configfile2 = applicationPath.parent_path().parent_path().append("cali-linker").append("sample_configs").append(configfile).string();
+			if (filesystem::exists(configfile2))
+				configfile = configfile2;
 		}
-		config = YamlConfig::fromFile(configfile);
+		if (!filesystem::exists(configfile)) {
+			for (size_t i = 0; i < arguments.size(); i++) {
+				const auto &s = arguments[i];
+				if (endsWith(s, ".la")) {
+					replace_libtool_in_arguments(s, i);
+				}
+			}
+			if (getenv("CALI_IGNORE_MISSING_CONFIG")) {
+				config = YamlConfig::empty();
+			} else if (getenv("CALI_GENERATE_CONFIG_TEMPLATES")) {
+				writeBoilerplateConfiguration(arguments, configfile);
+				config = YamlConfig::empty();
+			} else {
+				std::cerr << "\n\nNo configuration found, start with this boilerplate config\n(for example in " << configfile << "):\n\n";
+				std::cerr << generateBoilerplateConfiguration(arguments) << std::endl;
+				std::cerr << "\n\n" << std::endl;
+				throw std::runtime_error("Config file not found");
+			}
+		} else {
+			config = YamlConfig::fromFile(configfile);
+		}
 		modifyArguments();
 
 		// Parse other commandline arguments
@@ -174,7 +197,11 @@ public:
 					i--;
 				}
 			} else if (config.addLibstdcxx && s == "-lstdc++") {
-				add_file_to_library_list(applicationPath.parent_path().append("libstdc++.bc").string(), -1);
+				auto libstdcxxFile = applicationPath.parent_path().append("libstdc++.bc").string();
+				if (!filesystem::exists(libstdcxxFile)) {
+					libstdcxxFile = "/usr/cali-lib/libstdc++.bc";
+				}
+				add_file_to_library_list(libstdcxxFile, -1);
 				cerr << "Add libstdc++.bc" << endl;
 			} else if (startsWith(s, "-l") || endsWith(s, ".so") || endsWith(s, ".a")) {
 				auto lib = find_library(startsWith(s, "-l") ? "lib" + s.substr(2) : s);

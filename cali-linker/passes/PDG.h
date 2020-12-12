@@ -20,6 +20,7 @@ struct PDGNode {
 	bool ipcfunction = false; // true for functions in an other context
 	bool constant = false; // true if this node is immutable (no data edges should point towards it)
 	bool filedescriptor = false; // true if this node is a filedescriptor
+	bool influenced_by_shared = false; // true if this node can be interfered with by changing shared memory
 	char source_type = 0; // 0 = no source, 1 = malloc style/variable, 2 = posix_memalign style
 };
 

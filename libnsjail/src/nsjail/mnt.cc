@@ -394,6 +394,17 @@ static bool initCloneNs(nsjconf_t* nsjconf) {
 		}
 	}
 
+	// if cwd is not accessible - create an empty directory there
+	auto cwdpath = *destdir + nsjconf->cwd;
+	if (!nsjconf->cwd.empty() && access(cwdpath.c_str(), F_OK) != 0) {
+		if (errno == ENOENT ||errno == ENOTDIR) {
+			cwdpath += "/";
+			if (!util::createDirRecursively(cwdpath.c_str())) {
+				LOG_W("Couldn't create upper directories for '%s'", cwdpath.c_str());
+			}
+		}
+	}
+
 	if (umount2(tmpdir->c_str(), MNT_DETACH) == -1) {
 		PLOG_E("umount2('%s', MNT_DETACH)", tmpdir->c_str());
 		return false;
@@ -438,7 +449,10 @@ static bool initNsInternal(nsjconf_t* nsjconf) {
 	}
 
 	if (!nsjconf->cwd.empty() && chdir(nsjconf->cwd.c_str()) == -1) {
-		if (errno == EEXIST) return true; // directory not found because not shared
+		if (errno == ENOENT) {
+			LOG_W("Current directory \"%s\" is not shared, library has current working directory \"/\". Add \"$CWD\" to your config (readonly/readwrite permissions) if you need relative paths.", nsjconf->cwd.c_str());
+			return true; // directory not found because not shared
+		}
 		PLOG_E("chdir('%s')", nsjconf->cwd.c_str());
 		return false;
 	}

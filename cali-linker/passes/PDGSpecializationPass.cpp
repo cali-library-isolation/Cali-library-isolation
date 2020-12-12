@@ -23,6 +23,8 @@ void PDGSpecializationPass::getAnalysisUsage(llvm::AnalysisUsage &Info) const {
 	Info.addRequired<PDGReachabilityPass>();
 	Info.addRequired<DataDrivenSCCPass>();
 	Info.addPreserved<PDGCreationPass>();
+	// Info.addPreserved<DataDrivenSCCPass>();
+	Info.addPreserved<PDGReachabilityPass>();
 }
 
 bool PDGSpecializationPass::runOnModule(Module &M) {

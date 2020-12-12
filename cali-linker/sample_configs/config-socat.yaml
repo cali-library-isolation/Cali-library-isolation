@@ -25,8 +25,8 @@ contexts:
         - /dev/urandom
         - "$ARGV"
         - "$CWD"
-      readwrite:
-        - /tmp
+      readwrite: []
+        #- /tmp
       #user: 65534 # = nobody
       #group: 65534 # = nogroup
       # network: all/host, local, none

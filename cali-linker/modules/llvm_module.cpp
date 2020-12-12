@@ -9,6 +9,8 @@
 #include "../passes/DataDrivenSCCPass.h"
 #include "../passes/FunctionAliasResolverPass.h"
 #include "../cali_linker/debug.h"
+#include "../passes/PDGSharedReachabilityPass.h"
+#include "../passes/SimpleSharedAnalysisPass.h"
 #include <iostream>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IRReader/IRReader.h>
@@ -184,6 +186,12 @@ namespace ipcrewriter {
 		pm.add(new PDGCreationPass(config, contextConfig, symbols));
 		pm.add(new PDGReachabilityPass(config));
 		pm.add(new PDGSpecializationPass(config));
+		// TODO if?
+		//pm.add(new DataDrivenSCCPass(config, contextConfig));
+		//pm.add(new PDGSharedReachabilityPass(config, contextConfig));
+		if (contextConfig->warnings) {
+			pm.add(new SimpleSharedAnalysisPass(config));
+		}
 		if (config && config->writeGraphs) {
 			auto pass = new PDGWriterPass();
 			pass->runDot = config->writeGraphsDot;

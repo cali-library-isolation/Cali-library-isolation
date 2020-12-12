@@ -144,6 +144,18 @@ static void nsjail_addMount(struct nsjconf_t *conf, const char *path, int flags,
 		} else {
 			debug_printf("[nsjail] Error: unknown path \"%s\"", path);
 		}
+	} else if (path[0] == '/' && path[1] == '\0') {
+		nsjail_addMountSimple(conf, "/bin", flags, fs_type);
+		nsjail_addMountSimple(conf, "/dev", flags, fs_type);
+		nsjail_addMountSimple(conf, "/etc", flags, fs_type);
+		nsjail_addMountSimple(conf, "/home", flags, fs_type);
+		nsjail_addMountSimple(conf, "/lib", flags, fs_type);
+		nsjail_addMountSimple(conf, "/lib64", flags, fs_type);
+		nsjail_addMountSimple(conf, "/opt", flags, fs_type);
+		nsjail_addMountSimple(conf, "/run", flags, fs_type);
+		nsjail_addMountSimple(conf, "/srv", flags, fs_type);
+		nsjail_addMountSimple(conf, "/usr", flags, fs_type);
+		nsjail_addMountSimple(conf, "/var", flags, fs_type);
 	} else {
 		nsjail_addMountSimple(conf, path, flags, fs_type);
 	}

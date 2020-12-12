@@ -27,9 +27,12 @@ class DataDrivenSCCPass : public llvm::ModulePass {
 public:
 	static char ID;
 
-	DataDrivenSCCPass() : llvm::ModulePass(ID), config(nullptr) {}
+	DataDrivenSCCPass() : llvm::ModulePass(ID), config(nullptr) {
+		throw std::runtime_error("constructing data-driven scc pass without config!");
+	}
 
-	DataDrivenSCCPass(const YamlConfig *config, const ContextConfig *contextConfig) : llvm::ModulePass(ID), config(config), contextConfig(contextConfig) {}
+	DataDrivenSCCPass(const YamlConfig *config, const ContextConfig *contextConfig)
+		: llvm::ModulePass(ID), config(config), contextConfig(contextConfig) {}
 
 	void getAnalysisUsage(llvm::AnalysisUsage &Info) const override;
 

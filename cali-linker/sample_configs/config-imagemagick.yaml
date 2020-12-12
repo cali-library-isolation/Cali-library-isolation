@@ -18,6 +18,7 @@ contexts:
   library:
     selectors:
       - "libgs.so"
+      #- "libpng16.so"
     permissions:
       readonly:
         #- /bin
@@ -27,6 +28,7 @@ contexts:
         #- /usr
         #- /etc
         - /dev/urandom
+        - $HOME/Projekte/ipcprototype/demos/ghostscript  # TODO REMOVE IN RELEASE
         - /var/lib/ghostscript
         - /usr
       readwrite:

@@ -226,7 +226,7 @@ namespace ipcrewriter {
 				auto fdValue = fdValues.find(i);
 				if (fdValue != fdValues.end()) {
 					dbg_llvm_outs << " -> Wrapped outgoing fd #" << i << ": " << *value << "\n";
-					logEntries.push_back(" -> Wrapped outgoing fd #" + std::to_string(i));
+					logEntries.push_back(" -> Handling parameter #" + std::to_string(i) + " as file descriptor in function " + originalFunction->getName().str());
 					value = fdValue->second;
 				}
 				paramValues.push_back(value);
