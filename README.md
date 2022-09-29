@@ -8,6 +8,24 @@ Cali is fully compatible with any mainline Linux kernel and does not require sup
 We compartmentalize libraries into their own process and kernel namespace context with well-defined security policies.
 To preserve the functionality of the interactions between program and library, Cali uses a Program Dependency Graph to track data flow between the program and the library during link time.
 
+Cali was presented in the [AsiaCCS 2021](https://asiaccs2021.comp.polyu.edu.hk/) paper ["Cali: Compiler Assisted Library Isolation"](https://publications.cispa.saarland/3382/) by [Markus Bauer and Christian Rossow](https://cispa.saarland/group/rossow/). 
+
+```
+@inproceedings{Bauer2021Cali,
+          author = {Markus Bauer and Christian Rossow},
+         journal = {Proceedings of the 2021 ACM Asia Conference on Computer and Communications Security (ASIA CCS '21)},
+           title = {Cali: Compiler Assisted Library Isolation},
+            year = {2021},
+       booktitle = {Proceedings of the 2021 ACM Asia Conference on Computer and Communications Security},
+          series = {ASIA CCS '21},
+       publisher = {Association for Computing Machinery},
+             url = {https://publications.cispa.saarland/3382/},
+             doi = {10.1145/3433210.3453111},
+        keywords = {Library Isolation, Memory Isolation, Privilege Separation, Program Dependence Graph, Compiler, LLVM, Cali}
+}
+
+```
+
 
 Build
 -----
